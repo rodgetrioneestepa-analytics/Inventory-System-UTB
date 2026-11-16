@@ -3,7 +3,7 @@ Inventory System for UTB
 
 Under the Balete Inventory is a working React/TypeScript application backed by Express and SQLite. It includes inventory setup, menu and versioned recipes, suppliers, purchasing and partial receiving, an append-only stock ledger, wastage, physical counts, genuine operational sales, separate CSV import previews, reports and account administration.
 
-The supplied synthetic CSV is **catalog-only**, as explicitly confirmed by the user. It supplies 151 normalized menu names from 153 source spellings across 25 categories. It creates no operational sales, prices, stock or costs. No historical sales snapshot is implemented. See [data boundaries and operating rules](docs/DATA_AND_OPERATIONS.md).
+Synthetic, undated POS exports are **catalog-only**. The supplied export has 151 normalized menu names from 153 source spellings across 25 categories. It creates no operational sales, prices, stock or costs. See [data boundaries and operating rules](docs/DATA_AND_OPERATIONS.md).
 
 ## Install and run
 
@@ -23,7 +23,7 @@ Open [the development application](http://localhost:5173). Vite proxies `/api` t
 
 The local database is `data/utb.sqlite`, ignored by Git. Migrations apply on startup and through `npm run migrate`; no reset is needed. Existing `.env` and data files are never overwritten by setup. All test data is isolated from this database.
 
-For the current Codex Windows environment, where Node is bundled but npm is not on PATH, a PowerShell runner locates the installed runtime and uses the already installed dependencies:
+On Windows, the PowerShell runner uses the installed Node runtime and project dependencies. If Node is not on PATH, set `UTB_NODE_PATH` to a Node.js 24+ executable:
 
 ```powershell
 .\tools\run.ps1 admin:create
@@ -40,7 +40,7 @@ Use the **CSV imports** page: choose menu catalog, select the file, review error
 npm run catalog:import -- "C:\path\UTB-Datasheet-2023-ProductSales.csv" "your-admin-email"
 ```
 
-Omit the email for a disabled local import principal with no known password. This creates no login account usable by a person and grants no session. The supplied file's catalog was already imported into this workspace's ignored local database. You still need to create your own administrator using the command above. Fresh clones start empty and need their own import.
+Omit the email for a disabled local import principal with no known password. This creates no login account usable by a person and grants no session. Fresh clones start empty: create an administrator and import your menu catalog using the commands above.
 
 Names are normalized for uniqueness and original spellings are retained in source-row traceability. Reimporting an identical hash is a no-op. A changed catalog never overwrites confirmed prices or recipes. Category conflicts require review.
 
@@ -67,7 +67,7 @@ npm start
 
 Open [the built local application](http://127.0.0.1:3001). The Express server serves the built frontend and API together. This local HTTP example uses development cookie settings. For real deployment use HTTPS, set `NODE_ENV=production`, set `APP_ORIGIN` to the exact HTTPS origin, and configure your reverse proxy and host access. Production cookies are Secure, httpOnly and SameSite=Strict. Login is rate-limited; authenticated writes require a session CSRF token. Do not set production mode for plain HTTP localhost login.
 
-Set `DATABASE_PATH` to a non-synced local server disk before ongoing production use. The current workspace is under OneDrive; using the app for verification here does not establish it as a safe shared production database location. See the [backup and correction procedures](docs/DATA_AND_OPERATIONS.md).
+Set `DATABASE_PATH` to a non-synced local server disk before ongoing production use. See the [backup and correction procedures](docs/DATA_AND_OPERATIONS.md).
 
 ## Checks
 
@@ -87,7 +87,7 @@ npm test
 Remove-Item Env:UTB_CATALOG_SOURCE
 ```
 
-Without that variable, only the private-source test is explicitly skipped. The other tests use isolated labeled fixtures. Actual verified checks are recorded in [docs/VERIFICATION.md](docs/VERIFICATION.md).
+Without that variable, only the private-source test is explicitly skipped. The other tests use isolated labeled fixtures to verify posting, imports, permissions, account safeguards and persistence.
 
 ## Project layout
 
@@ -99,8 +99,8 @@ web/src/            Responsive React application and forms
 shared/             Shared transport types
 tests/browser/      Playwright browser workflows
 samples/            Blank CSV templates, no fabricated operational records
-tools/run.ps1       Windows runner using Node or the Codex bundled runtime
-docs/               API, business rules, limitations and verification
+tools/run.ps1       Windows runner using an installed Node runtime
+docs/               API, business rules and operating procedures
 ```
 
 See [API reference](docs/API.md) for endpoints, filters and request conventions. Real opening balances, recipes, pack conversions, suppliers, purchase costs and dated operational sales must be entered by UTB before live use. Purchase costs are stored, but financial inventory valuation and forecasting are intentionally unavailable without a defined costing method and appropriate real data.

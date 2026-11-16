@@ -11,3 +11,8 @@ test-results/
 *.log
 .local/
 private-source/
+
+# Local development instructions and build notes
+/AGENTS.md
+/CODEX_MASTER_PROMPT.md
+/docs/VERIFICATION.md
