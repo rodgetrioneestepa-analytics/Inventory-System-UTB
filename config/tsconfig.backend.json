@@ -7,9 +7,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "../dist/server",
-    "rootDir": "../inventory-webapp/backend/src",
+    "rootDir": "../backend/src",
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["../inventory-webapp/backend/src/**/*.ts"]
+  "include": ["../backend/src/**/*.ts"]
 }

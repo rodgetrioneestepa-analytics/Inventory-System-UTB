@@ -11,5 +11,5 @@
     "noEmit": true,
     "types": ["vite/client"]
   },
-  "include": ["../inventory-webapp/frontend/src/**/*", "../inventory-webapp/shared/**/*"]
+  "include": ["../frontend/src/**/*", "../shared/**/*"]
 }

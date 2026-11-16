@@ -8,9 +8,9 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "format": "prettier --write inventory-webapp tests config scripts/*.mjs",
-    "format:check": "prettier --check inventory-webapp tests config scripts/*.mjs",
-    "dev": "concurrently -k \"tsx watch inventory-webapp/backend/src/index.ts\" \"vite --config config/vite.config.ts --host 127.0.0.1\"",
+    "format": "prettier --write frontend backend shared tests config scripts/*.mjs",
+    "format:check": "prettier --check frontend backend shared tests config scripts/*.mjs",
+    "dev": "concurrently -k \"tsx watch backend/src/index.ts\" \"vite --config config/vite.config.ts --host 127.0.0.1\"",
     "build": "tsc -p config/tsconfig.backend.json && tsc -p config/tsconfig.frontend.json && vite build --config config/vite.config.ts",
     "build:vercel": "tsc -p config/tsconfig.frontend.json && vite build --config config/vite.config.ts && node scripts/build-vercel.mjs",
     "start": "node --env-file-if-exists=.env dist/server/index.js",
@@ -18,9 +18,9 @@
     "test": "tsx --test tests/backend/*.test.ts",
     "test:browser": "playwright test --config config/playwright.config.ts",
     "test:deployment": "node --test tests/deployment.test.mjs",
-    "migrate": "tsx inventory-webapp/backend/src/migrate.ts",
-    "admin:create": "tsx inventory-webapp/backend/src/admin.ts",
-    "catalog:import": "tsx inventory-webapp/backend/src/catalog.ts"
+    "migrate": "tsx backend/src/migrate.ts",
+    "admin:create": "tsx backend/src/admin.ts",
+    "catalog:import": "tsx backend/src/catalog.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

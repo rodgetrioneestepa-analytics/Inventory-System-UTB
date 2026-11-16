@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import { Store } from '../../inventory-webapp/backend/src/db.js';
+import { Store } from '../../backend/src/db.js';
 
 test('administrator CLI creates a hashed account without operational seeds and refuses overwrite', () => {
   const dir = mkdtempSync(join(tmpdir(), 'utb-admin-cli-'));
@@ -20,26 +20,18 @@ test('administrator CLI creates a hashed account without operational seeds and r
     ADMIN_PASSWORD: password,
   };
   try {
-    const first = spawnSync(
-      process.execPath,
-      ['--import', 'tsx', 'inventory-webapp/backend/src/admin.ts'],
-      {
-        cwd: process.cwd(),
-        env,
-        encoding: 'utf8',
-      },
-    );
+    const first = spawnSync(process.execPath, ['--import', 'tsx', 'backend/src/admin.ts'], {
+      cwd: process.cwd(),
+      env,
+      encoding: 'utf8',
+    });
     assert.equal(first.status, 0, first.stderr);
     assert.ok(!first.stdout.includes(password));
-    const second = spawnSync(
-      process.execPath,
-      ['--import', 'tsx', 'inventory-webapp/backend/src/admin.ts'],
-      {
-        cwd: process.cwd(),
-        env: { ...env, ADMIN_PASSWORD: randomUUID() },
-        encoding: 'utf8',
-      },
-    );
+    const second = spawnSync(process.execPath, ['--import', 'tsx', 'backend/src/admin.ts'], {
+      cwd: process.cwd(),
+      env: { ...env, ADMIN_PASSWORD: randomUUID() },
+      encoding: 'utf8',
+    });
     assert.notEqual(second.status, 0);
     assert.match(second.stderr, /already exists/);
     const s = new Store(path);

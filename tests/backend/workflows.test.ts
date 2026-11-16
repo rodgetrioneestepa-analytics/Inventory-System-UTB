@@ -5,10 +5,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import bcrypt from 'bcryptjs';
 import supertest from 'supertest';
-import { Store, id, now } from '../../inventory-webapp/backend/src/db.js';
-import { Ledger } from '../../inventory-webapp/backend/src/ledger.js';
-import { Imports } from '../../inventory-webapp/backend/src/imports.js';
-import { createApp } from '../../inventory-webapp/backend/src/app.js';
+import { Store, id, now } from '../../backend/src/db.js';
+import { Ledger } from '../../backend/src/ledger.js';
+import { Imports } from '../../backend/src/imports.js';
+import { createApp } from '../../backend/src/app.js';
 
 let s: Store, ledger: Ledger, imports: Imports, adminId: string, staffId: string;
 let app: ReturnType<typeof createApp>,

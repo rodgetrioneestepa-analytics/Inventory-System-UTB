@@ -2,8 +2,8 @@ import bcrypt from 'bcryptjs';
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { Store, id, now } from '../inventory-webapp/backend/src/db.js';
-import { createApp } from '../inventory-webapp/backend/src/app.js';
+import { Store, id, now } from '../backend/src/db.js';
+import { createApp } from '../backend/src/app.js';
 const dir = mkdtempSync(join(tmpdir(), 'utb-browser-'));
 const s = new Store(join(dir, 'browser.sqlite'));
 if (!process.env.UTB_E2E_PASSWORD)

@@ -18,14 +18,14 @@ $env:PATH=(Split-Path -Parent $nodePath)+';'+(Join-Path (Get-Location) 'node_mod
 if(!(Test-Path -LiteralPath 'node_modules')){throw 'Install dependencies using npm install (or pnpm install) first.'}
 switch($Task){
   'build'{& $nodePath node_modules/typescript/bin/tsc -p config/tsconfig.backend.json;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};& $nodePath node_modules/typescript/bin/tsc -p config/tsconfig.frontend.json;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};& $nodePath node_modules/vite/bin/vite.js build --config config/vite.config.ts}
-  'dev'{& $nodePath node_modules/concurrently/dist/bin/concurrently.js -k 'tsx watch inventory-webapp/backend/src/index.ts' 'vite --config config/vite.config.ts --host 127.0.0.1'}
+  'dev'{& $nodePath node_modules/concurrently/dist/bin/concurrently.js -k 'tsx watch backend/src/index.ts' 'vite --config config/vite.config.ts --host 127.0.0.1'}
   'test'{& $nodePath --import tsx --test 'tests/backend/*.test.ts'}
   'test:browser'{& $nodePath node_modules/@playwright/test/cli.js test --config config/playwright.config.ts}
   'test:deployment'{& $nodePath --test tests/deployment.test.mjs}
   'start'{& $nodePath --env-file-if-exists=.env dist/server/index.js}
   'tunnel'{& $nodePath scripts/local-tunnel.mjs @TaskArguments}
-  'migrate'{& $nodePath --import tsx inventory-webapp/backend/src/migrate.ts}
-  'admin:create'{& $nodePath --import tsx inventory-webapp/backend/src/admin.ts @TaskArguments}
-  'catalog:import'{& $nodePath --import tsx inventory-webapp/backend/src/catalog.ts @TaskArguments}
+  'migrate'{& $nodePath --import tsx backend/src/migrate.ts}
+  'admin:create'{& $nodePath --import tsx backend/src/admin.ts @TaskArguments}
+  'catalog:import'{& $nodePath --import tsx backend/src/catalog.ts @TaskArguments}
 }
 exit $LASTEXITCODE

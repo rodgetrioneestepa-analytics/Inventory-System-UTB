@@ -39,6 +39,6 @@ Posting requests share these fields:
 
 Use a new key for each distinct event. Retries of an identical request return `{ id, duplicate: true }`. Reusing a key with different contents is a conflict. Preview has no stock effect. Every confirmation revalidates within a SQLite `BEGIN IMMEDIATE` transaction.
 
-The exact request schemas are in `inventory-webapp/backend/src/schemas.ts`; the sale schema is used by both the form posting and operational importer. The service in `inventory-webapp/backend/src/ledger.ts` provides the transaction and stock invariants. SQL values are bound parameters. Table/column identifiers in queries come from fixed application code.
+The exact request schemas are in `backend/src/schemas.ts`; the sale schema is used by both the form posting and operational importer. The service in `backend/src/ledger.ts` provides the transaction and stock invariants. SQL values are bound parameters. Table/column identifiers in queries come from fixed application code.
 
 Import preview takes `{ kind: "catalog" | "sales", filename, content }`. Content must parse as CSV; the filename must end in `.csv`. The application accepts JSON-transported CSV content rather than executing or storing uploaded files on disk. CSV contents are capped at 20 MiB and 150,000 records. All CSV exports escape cells and neutralize spreadsheet formula prefixes.
