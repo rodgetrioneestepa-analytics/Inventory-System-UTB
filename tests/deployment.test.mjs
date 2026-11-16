@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { deploymentConfig, buildVercel } from '../tools/build-vercel.mjs';
-import { httpsOrigin } from '../tools/local-tunnel.mjs';
+import { deploymentConfig, buildVercel } from '../scripts/build-vercel.mjs';
+import { httpsOrigin } from '../scripts/local-tunnel.mjs';
 
 test('local tunnel frontend allowlist accepts only explicit HTTPS origins', () => {
   assert.equal(

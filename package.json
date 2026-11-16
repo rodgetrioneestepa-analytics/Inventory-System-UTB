@@ -8,19 +8,19 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "format": "prettier --write server/src server/tests web/src shared tests playwright.config.ts vite.config.ts",
-    "format:check": "prettier --check server/src server/tests web/src shared tests playwright.config.ts vite.config.ts",
-    "dev": "concurrently -k \"tsx watch server/src/index.ts\" \"vite --host 127.0.0.1\"",
-    "build": "tsc -p tsconfig.server.json && tsc -p tsconfig.web.json && vite build",
-    "build:vercel": "tsc -p tsconfig.web.json && vite build && node tools/build-vercel.mjs",
+    "format": "prettier --write inventory-webapp tests config scripts/*.mjs",
+    "format:check": "prettier --check inventory-webapp tests config scripts/*.mjs",
+    "dev": "concurrently -k \"tsx watch inventory-webapp/backend/src/index.ts\" \"vite --config config/vite.config.ts --host 127.0.0.1\"",
+    "build": "tsc -p config/tsconfig.backend.json && tsc -p config/tsconfig.frontend.json && vite build --config config/vite.config.ts",
+    "build:vercel": "tsc -p config/tsconfig.frontend.json && vite build --config config/vite.config.ts && node scripts/build-vercel.mjs",
     "start": "node --env-file-if-exists=.env dist/server/index.js",
-    "tunnel": "node tools/local-tunnel.mjs",
-    "test": "tsx --test server/tests/*.test.ts",
-    "test:browser": "playwright test",
+    "tunnel": "node scripts/local-tunnel.mjs",
+    "test": "tsx --test tests/backend/*.test.ts",
+    "test:browser": "playwright test --config config/playwright.config.ts",
     "test:deployment": "node --test tests/deployment.test.mjs",
-    "migrate": "tsx server/src/migrate.ts",
-    "admin:create": "tsx server/src/admin.ts",
-    "catalog:import": "tsx server/src/catalog.ts"
+    "migrate": "tsx inventory-webapp/backend/src/migrate.ts",
+    "admin:create": "tsx inventory-webapp/backend/src/admin.ts",
+    "catalog:import": "tsx inventory-webapp/backend/src/catalog.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

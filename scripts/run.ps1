@@ -1,5 +1,5 @@
 param(
-  [Parameter(Position=0)][ValidateSet('dev','build','test','test:browser','start','migrate','admin:create','catalog:import')][string]$Task='dev',
+  [Parameter(Position=0)][ValidateSet('dev','build','test','test:browser','test:deployment','start','tunnel','migrate','admin:create','catalog:import')][string]$Task='dev',
   [Parameter(ValueFromRemainingArguments=$true)][string[]]$TaskArguments
 )
 $ErrorActionPreference='Stop'
@@ -17,13 +17,15 @@ if(!(Test-Path -LiteralPath $nodePath)){throw 'The configured Node runtime is mi
 $env:PATH=(Split-Path -Parent $nodePath)+';'+(Join-Path (Get-Location) 'node_modules\.bin')+';'+$env:PATH
 if(!(Test-Path -LiteralPath 'node_modules')){throw 'Install dependencies using npm install (or pnpm install) first.'}
 switch($Task){
-  'build'{& $nodePath node_modules/typescript/bin/tsc -p tsconfig.server.json;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};& $nodePath node_modules/typescript/bin/tsc -p tsconfig.web.json;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};& $nodePath node_modules/vite/bin/vite.js build}
-  'dev'{& $nodePath node_modules/concurrently/dist/bin/concurrently.js -k 'tsx watch server/src/index.ts' 'vite --host 127.0.0.1'}
-  'test'{& $nodePath --import tsx --test 'server/tests/*.test.ts'}
-  'test:browser'{& $nodePath node_modules/@playwright/test/cli.js test}
+  'build'{& $nodePath node_modules/typescript/bin/tsc -p config/tsconfig.backend.json;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};& $nodePath node_modules/typescript/bin/tsc -p config/tsconfig.frontend.json;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};& $nodePath node_modules/vite/bin/vite.js build --config config/vite.config.ts}
+  'dev'{& $nodePath node_modules/concurrently/dist/bin/concurrently.js -k 'tsx watch inventory-webapp/backend/src/index.ts' 'vite --config config/vite.config.ts --host 127.0.0.1'}
+  'test'{& $nodePath --import tsx --test 'tests/backend/*.test.ts'}
+  'test:browser'{& $nodePath node_modules/@playwright/test/cli.js test --config config/playwright.config.ts}
+  'test:deployment'{& $nodePath --test tests/deployment.test.mjs}
   'start'{& $nodePath --env-file-if-exists=.env dist/server/index.js}
-  'migrate'{& $nodePath --import tsx server/src/migrate.ts}
-  'admin:create'{& $nodePath --import tsx server/src/admin.ts @TaskArguments}
-  'catalog:import'{& $nodePath --import tsx server/src/catalog.ts @TaskArguments}
+  'tunnel'{& $nodePath scripts/local-tunnel.mjs @TaskArguments}
+  'migrate'{& $nodePath --import tsx inventory-webapp/backend/src/migrate.ts}
+  'admin:create'{& $nodePath --import tsx inventory-webapp/backend/src/admin.ts @TaskArguments}
+  'catalog:import'{& $nodePath --import tsx inventory-webapp/backend/src/catalog.ts @TaskArguments}
 }
 exit $LASTEXITCODE

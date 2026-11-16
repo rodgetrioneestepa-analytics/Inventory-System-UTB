@@ -16,12 +16,12 @@ export class Store {
     this.db.exec(
       'CREATE TABLE IF NOT EXISTS schema_migrations(version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)',
     );
-    for (const file of readdirSync(resolve('server/migrations'))
+    for (const file of readdirSync(resolve('database/migrations'))
       .filter((x) => x.endsWith('.sql'))
       .sort()) {
       if (!this.get('SELECT version FROM schema_migrations WHERE version=?', file))
         this.tx(() => {
-          this.db.exec(readFileSync(resolve('server/migrations', file), 'utf8'));
+          this.db.exec(readFileSync(resolve('database/migrations', file), 'utf8'));
           this.run('INSERT INTO schema_migrations VALUES (?,?)', file, now());
         });
     }

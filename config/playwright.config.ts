@@ -1,8 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
 process.env.UTB_E2E_PASSWORD ??= randomUUID();
 export default defineConfig({
-  testDir: './tests/browser',
+  testDir: resolve(import.meta.dirname, '../tests/browser'),
+  outputDir: resolve(import.meta.dirname, '../test-results'),
   fullyParallel: false,
   workers: 1,
   timeout: 60000,
@@ -15,6 +17,7 @@ export default defineConfig({
   },
   projects: [{ name: 'desktop', use: { ...devices['Desktop Chrome'], channel: 'chrome' } }],
   webServer: {
+    cwd: resolve(import.meta.dirname, '..'),
     command: `"${process.execPath}" --import tsx tests/browser-server.ts`,
     url: 'http://127.0.0.1:3012/api/health',
     reuseExistingServer: false,

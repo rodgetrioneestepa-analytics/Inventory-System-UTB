@@ -10,15 +10,15 @@ The original GitHub repository contained only a README. No deployed database, ex
 
 The supplied `UTB-Datasheet-2023-ProductSales.csv` was read and rechecked programmatically:
 
-| File diagnostic | Observed |
-|---|---:|
-| Source line items | 78,310 |
-| Distinct source transaction IDs | 18,403 |
-| Distinct source product spellings | 153 |
-| Distinct normalized catalog names | 151 |
-| Categories | 25 |
-| Rows with zero price and amount | 2,020 |
-| Qty × UnitPrice discrepancies above ₱0.01 | 0 |
+| File diagnostic                           | Observed |
+| ----------------------------------------- | -------: |
+| Source line items                         |   78,310 |
+| Distinct source transaction IDs           |   18,403 |
+| Distinct source product spellings         |      153 |
+| Distinct normalized catalog names         |      151 |
+| Categories                                |       25 |
+| Rows with zero price and amount           |    2,020 |
+| Qty × UnitPrice discrepancies above ₱0.01 |        0 |
 
 SHA-256 of the decoded UTF-8 source content: `dca17a2f7f8ff7c24c6dc03a0e6e2384048202a045cd0b6eac9e0703ee5963de`.
 

@@ -1,9 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Store, id, now } from '../src/db.js';
-import { Ledger } from '../src/ledger.js';
-import { Imports } from '../src/imports.js';
-import { openingSchema, saleSchema, passwordSchema } from '../src/schemas.js';
+import { Store, id, now } from '../../inventory-webapp/backend/src/db.js';
+import { Ledger } from '../../inventory-webapp/backend/src/ledger.js';
+import { Imports } from '../../inventory-webapp/backend/src/imports.js';
+import {
+  openingSchema,
+  saleSchema,
+  passwordSchema,
+} from '../../inventory-webapp/backend/src/schemas.js';
 const event = () => ({ key: id(), reference: id(), reason: 'TEST ONLY', occurred_at: now() });
 function fixture() {
   const s = new Store(':memory:');

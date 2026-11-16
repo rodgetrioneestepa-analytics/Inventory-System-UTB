@@ -8,6 +8,8 @@ The deployed website was checked in Chrome: administrator login, all main pages,
 
 ## Start the local connection
 
+Run all commands from the repository root. The helpers live in `scripts/`; `npm run tunnel` selects the correct helper automatically.
+
 Install Cloudflare's official `cloudflared` executable. On Windows this project also checks `.local/bin/cloudflared.exe`; on other systems it uses `cloudflared` on PATH. `CLOUDFLARED_PATH` can specify another executable. Verify downloaded binaries against the official release checksums.
 
 ```sh
