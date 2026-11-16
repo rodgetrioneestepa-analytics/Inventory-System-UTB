@@ -11,6 +11,7 @@ test-results/
 *.log
 .local/
 private-source/
+.vercel/
 
 # Local development instructions and build notes
 /AGENTS.md

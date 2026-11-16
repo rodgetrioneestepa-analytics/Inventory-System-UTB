@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.25.0",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -11,9 +12,11 @@
     "format:check": "prettier --check server/src server/tests web/src shared tests playwright.config.ts vite.config.ts",
     "dev": "concurrently -k \"tsx watch server/src/index.ts\" \"vite --host 127.0.0.1\"",
     "build": "tsc -p tsconfig.server.json && tsc -p tsconfig.web.json && vite build",
+    "build:vercel": "tsc -p tsconfig.web.json && vite build && node tools/build-vercel.mjs",
     "start": "node --env-file-if-exists=.env dist/server/index.js",
     "test": "tsx --test server/tests/*.test.ts",
     "test:browser": "playwright test",
+    "test:deployment": "node --test tests/deployment.test.mjs",
     "migrate": "tsx server/src/migrate.ts",
     "admin:create": "tsx server/src/admin.ts",
     "catalog:import": "tsx server/src/catalog.ts"
