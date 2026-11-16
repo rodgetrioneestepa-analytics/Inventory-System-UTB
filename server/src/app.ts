@@ -71,6 +71,9 @@ export function createApp(
     res.json({ rows: map ? rows.map(map) : rows, total, page, limit });
   };
   app.disable('x-powered-by');
+  // Vite and cloudflared connect from loopback. Never trust forwarded client IPs
+  // from arbitrary internet peers or enable blanket trust for proxy headers.
+  app.set('trust proxy', 'loopback');
   app.use(
     helmet({
       contentSecurityPolicy: {

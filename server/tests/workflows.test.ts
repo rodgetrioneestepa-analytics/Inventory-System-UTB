@@ -160,6 +160,33 @@ before(async () => {
 });
 after(() => s.close());
 
+test('proxy trust is limited to loopback and login limits remain per client', async () => {
+  const trust = app.get('trust proxy fn');
+  assert.equal(trust('127.0.0.1', 0), true);
+  assert.equal(trust('::1', 0), true);
+  assert.equal(trust('203.0.113.20', 0), false);
+  for (let i = 1; i <= 12; i++) {
+    const response = await supertest(app)
+      .post('/api/auth/login')
+      .set('Origin', origin)
+      .set('X-Forwarded-For', `198.51.100.${i}`)
+      .send({ email: 'admin@test.local', password });
+    assert.equal(
+      response.status,
+      200,
+      'Independent forwarded clients must not share the loopback login limit',
+    );
+  }
+  for (let i = 0; i < 11; i++) {
+    const response = await supertest(app)
+      .post('/api/auth/login')
+      .set('Origin', origin)
+      .set('X-Forwarded-For', '203.0.113.71')
+      .send({ email: 'admin@test.local', password: 'incorrect-password' });
+    assert.equal(response.status, i < 10 ? 401 : 429);
+  }
+});
+
 test('opening is unknown, required for posting, can be zero and cannot be duplicated', () => {
   const i = item();
   assert.equal(ledger.balances(i).balance, null);

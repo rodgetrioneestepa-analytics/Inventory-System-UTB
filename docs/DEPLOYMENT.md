@@ -2,6 +2,10 @@
 
 The selected setup uses Vercel for the public frontend and this computer for the existing Node.js backend and SQLite database. No paid backend or hosted database is required. The paid Render blueprint was removed. The database file, administrator and operational records stay on the computer.
 
+Production website: [https://under-the-balete-inventory.vercel.app](https://under-the-balete-inventory.vercel.app). The initial deployment was made through the authenticated Vercel API using the verified repository source. Automatic deployments from GitHub are not connected yet; enabling those separately requires installing Vercel's GitHub integration. The Vercel project's production `UTB_API_ORIGIN` points at the active tunnel, and `.local/tunnel-origin.txt` authorizes the production website on the local backend.
+
+The deployed website was checked in Chrome: administrator login, all main pages, catalog data matching the local SQLite database, refresh persistence, CSV report export, mobile navigation and logout. Browser/API failure checks and the local backend error scan were clean. This checks the deployed connection; it does not make the temporary tunnel persistent across computer or tunnel restarts.
+
 ## Start the local connection
 
 Install Cloudflare's official `cloudflared` executable. On Windows this project also checks `.local/bin/cloudflared.exe`; on other systems it uses `cloudflared` on PATH. `CLOUDFLARED_PATH` can specify another executable. Verify downloaded binaries against the official release checksums.

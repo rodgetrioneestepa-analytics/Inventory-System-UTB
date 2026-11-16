@@ -3,6 +3,8 @@ Inventory System for UTB
 
 Under the Balete Inventory is a working React/TypeScript application backed by Express and SQLite. It includes inventory setup, menu and versioned recipes, suppliers, purchasing and partial receiving, an append-only stock ledger, wastage, physical counts, genuine operational sales, separate CSV import previews, reports and account administration.
 
+Website: [under-the-balete-inventory.vercel.app](https://under-the-balete-inventory.vercel.app). The backend and database run on the owner's computer through a secure tunnel, so that computer and tunnel must remain running. See [deployment instructions](docs/DEPLOYMENT.md) for restarting or reconnecting it.
+
 Synthetic, undated POS exports are **catalog-only**. The supplied export has 151 normalized menu names from 153 source spellings across 25 categories. It creates no operational sales, prices, stock or costs. See [data boundaries and operating rules](docs/DATA_AND_OPERATIONS.md).
 
 ## Install and run
