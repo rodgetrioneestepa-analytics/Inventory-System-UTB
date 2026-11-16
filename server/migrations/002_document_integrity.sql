@@ -1,0 +1,18 @@
+CREATE INDEX sale_lines_product ON operational_sale_lines(product_id);
+CREATE INDEX receipt_po_line ON receipt_lines(po_line_id);
+CREATE INDEX recipe_product ON recipes(product_id);
+CREATE INDEX recipe_version ON recipe_versions(recipe_id,version);
+CREATE INDEX import_row_parent ON import_rows(import_id,row_number);
+CREATE INDEX batch_item_expiry ON stock_batches(item_id,expiry_date);
+CREATE TRIGGER immutable_sale_update BEFORE UPDATE ON operational_sales BEGIN SELECT RAISE(ABORT,'Posted sales are immutable'); END;
+CREATE TRIGGER immutable_sale_delete BEFORE DELETE ON operational_sales BEGIN SELECT RAISE(ABORT,'Posted sales are immutable'); END;
+CREATE TRIGGER immutable_sale_line_update BEFORE UPDATE ON operational_sale_lines BEGIN SELECT RAISE(ABORT,'Posted sale lines are immutable'); END;
+CREATE TRIGGER immutable_sale_line_delete BEFORE DELETE ON operational_sale_lines BEGIN SELECT RAISE(ABORT,'Posted sale lines are immutable'); END;
+CREATE TRIGGER immutable_receipt_update BEFORE UPDATE ON receipts BEGIN SELECT RAISE(ABORT,'Posted receipts are immutable'); END;
+CREATE TRIGGER immutable_receipt_delete BEFORE DELETE ON receipts BEGIN SELECT RAISE(ABORT,'Posted receipts are immutable'); END;
+CREATE TRIGGER immutable_receipt_line_update BEFORE UPDATE ON receipt_lines BEGIN SELECT RAISE(ABORT,'Posted receipt lines are immutable'); END;
+CREATE TRIGGER immutable_receipt_line_delete BEFORE DELETE ON receipt_lines BEGIN SELECT RAISE(ABORT,'Posted receipt lines are immutable'); END;
+CREATE TRIGGER immutable_batch_update BEFORE UPDATE ON stock_batches BEGIN SELECT RAISE(ABORT,'Posted batch metadata is immutable'); END;
+CREATE TRIGGER immutable_batch_delete BEFORE DELETE ON stock_batches BEGIN SELECT RAISE(ABORT,'Posted batch metadata is immutable'); END;
+DROP TRIGGER stock_not_negative;
+CREATE TRIGGER stock_not_negative BEFORE INSERT ON stock_movements WHEN NEW.quantity<0 AND COALESCE((SELECT SUM(quantity) FROM stock_movements WHERE batch_id=NEW.batch_id),0)+NEW.quantity < -0.0000001 BEGIN SELECT RAISE(ABORT,'Insufficient batch stock'); END;

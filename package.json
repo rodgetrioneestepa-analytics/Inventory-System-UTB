@@ -1,0 +1,53 @@
+{
+  "name": "under-the-balete-inventory",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "format": "prettier --write server/src server/tests web/src shared tests playwright.config.ts vite.config.ts",
+    "format:check": "prettier --check server/src server/tests web/src shared tests playwright.config.ts vite.config.ts",
+    "dev": "concurrently -k \"tsx watch server/src/index.ts\" \"vite --host 127.0.0.1\"",
+    "build": "tsc -p tsconfig.server.json && tsc -p tsconfig.web.json && vite build",
+    "start": "node --env-file-if-exists=.env dist/server/index.js",
+    "test": "tsx --test server/tests/*.test.ts",
+    "test:browser": "playwright test",
+    "migrate": "tsx server/src/migrate.ts",
+    "admin:create": "tsx server/src/admin.ts",
+    "catalog:import": "tsx server/src/catalog.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.7",
+    "csv-parse": "^6.1.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.5",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@tailwindcss/vite": "^4.1.17",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@types/supertest": "^6.0.3",
+    "@vitejs/plugin-react": "^5.1.0",
+    "concurrently": "^9.2.1",
+    "prettier": "^3.10.1",
+    "supertest": "^7.1.4",
+    "tailwindcss": "^4.1.17",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2"
+  }
+}
