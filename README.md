@@ -59,7 +59,7 @@ Owner/Admin can configure and post all workflows. Inventory Staff can view stock
 
 ## Production build and local serving
 
-For online hosting, see [Vercel frontend and persistent backend deployment](docs/DEPLOYMENT.md). Vercel needs a separate persistent backend for this SQLite application; a static Vite deployment alone does not provide working logins or stock persistence.
+For online hosting, see [Vercel website with a local backend and database](docs/DEPLOYMENT.md). The database can remain on this computer while a secure HTTPS tunnel connects the Vercel frontend to the Node.js backend. The computer, backend and tunnel must stay running.
 
 ```powershell
 npm run build

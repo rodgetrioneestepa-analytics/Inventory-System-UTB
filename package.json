@@ -14,6 +14,7 @@
     "build": "tsc -p tsconfig.server.json && tsc -p tsconfig.web.json && vite build",
     "build:vercel": "tsc -p tsconfig.web.json && vite build && node tools/build-vercel.mjs",
     "start": "node --env-file-if-exists=.env dist/server/index.js",
+    "tunnel": "node tools/local-tunnel.mjs",
     "test": "tsx --test server/tests/*.test.ts",
     "test:browser": "playwright test",
     "test:deployment": "node --test tests/deployment.test.mjs",

@@ -4,6 +4,22 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { deploymentConfig, buildVercel } from '../tools/build-vercel.mjs';
+import { httpsOrigin } from '../tools/local-tunnel.mjs';
+
+test('local tunnel frontend allowlist accepts only explicit HTTPS origins', () => {
+  assert.equal(
+    httpsOrigin('https://actual-project.vercel.app/'),
+    'https://actual-project.vercel.app',
+  );
+  for (const origin of [
+    '*',
+    'http://example.com',
+    'https://user:password@example.com',
+    'https://example.com/path',
+    'https://example.com?all=1',
+  ])
+    assert.throws(() => httpsOrigin(origin));
+});
 
 test('Vercel deployment requires a hosted HTTPS backend and rejects credentials and paths', () => {
   for (const value of [
