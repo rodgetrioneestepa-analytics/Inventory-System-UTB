@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { attachDatabasePool } from '@vercel/functions';
-import { createApp } from '../backend/src/app.js';
-import { Store } from '../backend/src/db.js';
+import { createApp } from './app.js';
+import { Store } from './db.js';
 
 let application: ReturnType<typeof createApp> | undefined;
 export function getHostedApplication() {

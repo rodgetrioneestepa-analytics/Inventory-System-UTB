@@ -22,7 +22,7 @@ switch($Task){
   'test'{& $nodePath --import tsx --test 'tests/backend/*.test.ts'}
   'test:postgres'{& $nodePath --import tsx --test tests/postgres.test.ts}
   'test:cloud'{& $nodePath --import tsx --test tests/cloud-storage.test.ts}
-  'build:backend'{& $nodePath node_modules/typescript/bin/tsc -p config/tsconfig.backend.json;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};& $nodePath node_modules/typescript/bin/tsc -p config/tsconfig.api.json --noEmit}
+  'build:backend'{& $nodePath node_modules/typescript/bin/tsc -p config/tsconfig.backend.json}
   'test:browser'{& $nodePath node_modules/@playwright/test/cli.js test --config config/playwright.config.ts}
   'test:deployment'{& $nodePath --test tests/deployment.test.mjs}
   'start'{& $nodePath --env-file-if-exists=.env dist/server/index.js}

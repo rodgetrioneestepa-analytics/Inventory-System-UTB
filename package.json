@@ -5,14 +5,14 @@
   "type": "module",
   "packageManager": "pnpm@11.25.0",
   "engines": {
-    "node": ">=24.0.0"
+    "node": "24.x"
   },
   "scripts": {
     "format": "prettier --write frontend backend api shared tests config scripts/*.mjs scripts/*.ts",
     "format:check": "prettier --check frontend backend api shared tests config scripts/*.mjs scripts/*.ts",
     "dev": "concurrently -k \"tsx watch backend/src/index.ts\" \"vite --config config/vite.config.ts --host 127.0.0.1\"",
     "build": "tsc -p config/tsconfig.backend.json && tsc -p config/tsconfig.frontend.json && vite build --config config/vite.config.ts",
-    "build:backend": "tsc -p config/tsconfig.backend.json && tsc -p config/tsconfig.api.json --noEmit",
+    "build:backend": "tsc -p config/tsconfig.backend.json",
     "build:vercel": "tsc -p config/tsconfig.frontend.json && vite build --config config/vite.config.ts && node scripts/build-vercel.mjs",
     "start": "node --env-file-if-exists=.env dist/server/index.js",
     "tunnel": "node scripts/local-tunnel.mjs",
