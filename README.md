@@ -6,6 +6,8 @@ Under the Balete Inventory is a working React/TypeScript application backed by E
 
 Website: [under-the-balete-inventory.vercel.app](https://under-the-balete-inventory.vercel.app). Cloud hosting uses Vercel Functions and Neon PostgreSQL, replacing the temporary local tunnel. See [deployment instructions](docs/DEPLOYMENT.md) for configuration, data-preserving migration and verification.
 
+The [hosted verification report](docs/HOSTING_VERIFICATION.md) records the data-preservation checks and workflows tested with the local server and tunnel stopped.
+
 Synthetic, undated POS exports are **catalog-only**. The supplied export has 151 normalized menu names from 153 source spellings across 25 categories. It creates no operational sales, prices, stock or costs. See [data boundaries and operating rules](docs/DATA_AND_OPERATIONS.md).
 
 ## Install and run
