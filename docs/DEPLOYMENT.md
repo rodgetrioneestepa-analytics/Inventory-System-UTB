@@ -1,55 +1,71 @@
-# Vercel website with a local backend and database
+# Vercel frontend and API with Neon PostgreSQL
 
-The selected setup uses Vercel for the public frontend and this computer for the existing Node.js backend and SQLite database. No paid backend or hosted database is required. The paid Render blueprint was removed. The database file, administrator and operational records stay on the computer.
+Cloud hosting uses two Vercel projects and one Neon Free database. The React website proxies same-origin /api requests to Express in Vercel Functions; the API persists users, sessions, catalog and inventory in PostgreSQL. The computer and temporary tunnel are no longer needed after verified cutover.
 
-Production website: [https://under-the-balete-inventory.vercel.app](https://under-the-balete-inventory.vercel.app). The initial deployment was made through the authenticated Vercel API using the verified repository source. Automatic deployments from GitHub are not connected yet; enabling those separately requires installing Vercel's GitHub integration. The Vercel project's production `UTB_API_ORIGIN` points at the active tunnel, and `.local/tunnel-origin.txt` authorizes the production website on the local backend.
+| Component | Project                                                                                | Configuration              |
+| --------- | -------------------------------------------------------------------------------------- | -------------------------- |
+| Frontend  | [under-the-balete-inventory.vercel.app](https://under-the-balete-inventory.vercel.app) | Root vercel.json           |
+| Backend   | under-the-balete-inventory-api                                                         | config/vercel.backend.json |
+| Database  | neon-bronze-house, Neon Free                                                           | Server-only DATABASE_URL   |
 
-The deployed website was checked in Chrome: administrator login, all main pages, catalog data matching the local SQLite database, refresh persistence, CSV report export, mobile navigation and logout. Browser/API failure checks and the local backend error scan were clean. This checks the deployed connection; it does not make the temporary tunnel persistent across computer or tunnel restarts.
+Free service quotas and eligibility apply. No paid upgrades, additional paid resources or overages are authorized. A dormant database can take longer to answer its first request. Independent backups and uptime monitoring remain the owner's responsibility.
 
-## Start the local connection
+## Backend deployment
 
-Run all commands from the repository root. The helpers live in `scripts/`; `npm run tunnel` selects the correct helper automatically.
-
-Install Cloudflare's official `cloudflared` executable. On Windows this project also checks `.local/bin/cloudflared.exe`; on other systems it uses `cloudflared` on PATH. `CLOUDFLARED_PATH` can specify another executable. Verify downloaded binaries against the official release checksums.
-
-```sh
-npm run build
-npm run tunnel
-```
-
-Keep the terminal and computer running. The helper creates a free Cloudflare Quick Tunnel and starts a separate production-mode backend on loopback port 3002. It uses the existing `DATABASE_PATH` and requires no database copy. The original local server on port 3001 is unaffected. The temporary HTTPS address also serves the complete built system, with secure httpOnly session cookies and an exact origin allowlist.
-
-The tunnel's HTTPS address is recorded in ignored `.local/tunnel-state.json`. Quick Tunnels are temporary, intended for development/testing and have no uptime guarantee. Restarting the tunnel changes its URL. A stable deployment needs a named tunnel and a suitable hostname or a separate hosting arrangement. Sleeping, restarting or disconnecting the computer makes the online system unavailable.
-
-## Connect Vercel
-
-1. Connect a Vercel account and import this repository, using the repository root and Framework Preset **Other**. `vercel.json` supplies the installation/build commands.
-2. Set the build-only `UTB_API_ORIGIN` to the actual HTTPS tunnel origin, with no `/api` path. Do not use `localhost` because Vercel cannot reach the computer's private loopback address directly.
-3. Build and deploy. `npm run build:vercel` emits Build Output API v3 at `.vercel/output`. Only generated frontend assets are copied. API requests are proxied to the tunnel without caching session responses; application paths use the React Router fallback.
-4. Once Vercel returns the actual production origin, authorize it on the local backend:
+Use the repository root, Node.js 24 and Framework Preset Other. Link the backend project and use its configuration:
 
 ```sh
-npm run tunnel -- --set-frontend-origin https://YOUR-ACTUAL-PROJECT.vercel.app
+vercel deploy --prod --local-config config/vercel.backend.json
 ```
 
-The helper restarts only its public backend to apply the new origin while retaining the same tunnel URL. Never authorize `*` or every preview domain. Vercel preview deployments must be explicitly authorized or use a separate isolated test backend.
+With the authenticated deployment connector, submit reviewed source files with config/vercel.backend.json as that deployment's root vercel.json. Keep the repository's actual root configuration for the frontend. Never deploy frontend configuration to the API project.
 
-5. Verify login/logout and the main workflows through the Vercel URL. The same existing local administrator and records are used. Test actual CSV uploads through the hosted route before enabling large operational imports.
+Connect Neon through Vercel Marketplace. Configure these production variables on the backend project:
 
-To stop the public connection while leaving the original local app available:
+- DATABASE_URL: pooled PostgreSQL connection string, TLS enabled, sensitive and server-only.
+- APP_ORIGIN: https://under-the-balete-inventory.vercel.app exactly.
+- NODE_ENV: production.
+
+Keep the production database unavailable to untrusted preview code. Use an isolated database for previews. The API refuses to initialize without PostgreSQL and never falls back to ephemeral SQLite on Vercel. Migrations and account creation are explicit maintenance commands, never startup seeds.
+
+## Copy an existing SQLite installation
+
+1. Preserve .env and the original database. Save the full Neon connection string as DATABASE_URL=... in ignored .local/cloud-postgres.env. Never put it in chat, GitHub, frontend variables or build artifacts.
+2. Run tests and build. Deploy the API while leaving the frontend on its current service until copying succeeds.
+3. Pause operational writes for cutover. Run from the repository root:
+
+```powershell
+node --env-file=.local/cloud-postgres.env --import tsx scripts/migrate-sqlite-to-postgres.ts --hold
+# Windows runtime helper:
+.\scripts\run.ps1 migrate:cloud --hold
+```
+
+The command applies PostgreSQL migrations, makes a consistent SQLite backup, holds a source write lock and copies all 26 business tables in one PostgreSQL transaction. It retains IDs, password hashes, recipe versions, posted movements, import traceability and audit entries. Each table is compared by count and SHA-256 of canonical row contents. A nonempty target is refused; no reset occurs. Backups and verification reports remain private in .local/backups/.
+
+4. Check backend /api/health and login. Set frontend UTB_API_ORIGIN to the stable backend HTTPS origin without /api and deploy the frontend. Verify login, pages, refresh, export and logout.
+5. Stop the previous local production server and tunnel only after cloud checks pass. Record the absolute source_path and hosted website in ignored .local/cloud-cutover.json. The app then refuses to reopen that retired SQLite file, preventing divergent records. Use another DATABASE_PATH for independent development.
+6. Release the source lock by writing .local/postgres-cutover-control.json with the session from .local/postgres-cutover-state.json and release: true. The lock also expires after 15 minutes. Keep the original database and backup.
+
+If verification fails before switching the frontend, retain the original service and release the lock. Once cloud users start writing, the old SQLite file is a backup rather than an interchangeable production database. Returning to SQLite requires an explicit verified migration of newer cloud records.
+
+## Frontend deployment
+
+Link the frontend project and use root vercel.json. Set build-only UTB_API_ORIGIN to the stable backend HTTPS origin. Then deploy the reviewed source:
 
 ```sh
-npm run tunnel -- --stop
+vercel deploy --prod
 ```
 
-When the tunnel URL changes, update Vercel's `UTB_API_ORIGIN` and redeploy the frontend. Keep SQLite backups separately and never commit the database, passwords or tunnel state. Free service eligibility and quotas still apply; this setup does not approve plan upgrades or paid overages.
+The build:vercel script writes Build Output API v3 to .vercel/output. Static output contains only frontend assets. API requests proxy to the backend before the SPA fallback without caching sessions. Database credentials are unnecessary on the frontend. These projects currently use authenticated API deployments; GitHub automatic deployments require a separately connected Git integration. A GitHub push alone does not deploy them.
 
-## Login connection errors
+## Authentication, uploads and operations
 
-If the website opens but login reports that the inventory server is unavailable, check the backend connection before changing any account credentials. A `502 DNS_HOSTNAME_NOT_FOUND` response from `/api/health` means Vercel cannot resolve its configured tunnel hostname. The local database can still be healthy while a temporary tunnel has expired or disconnected.
+Sessions and shared login rate counters persist in PostgreSQL across function instances. Cookies remain Secure, httpOnly and SameSite=Strict through the frontend proxy. Authenticated writes require CSRF tokens and the exact permitted origin. Inventory postings use one checked-out connection and a database advisory transaction lock to serialize changes.
 
-Check `http://127.0.0.1:3002/api/health` on the backend computer, then the HTTPS `/api/health` at the URL in `.local/tunnel-state.json`. If the temporary tunnel is gone, stop it with `npm run tunnel -- --stop`, start `npm run tunnel`, and use the new HTTPS origin for the production `UTB_API_ORIGIN`. Redeploy Vercel and verify `/api/health`, login, refresh and logout through the production website. Never reset the database or recreate the administrator to repair a network connection.
+CSV limits remain 20 MiB and 150,000 records. Larger browser uploads use authenticated chunks below individual function request limits. Staging belongs to its administrator and expires after 30 minutes; successful preview removes it. Catalog import persists approved catalog metadata only, never synthetic quantities or prices as operational data.
 
-The login form handles text/HTML gateway errors without exposing a JSON parsing error and allows retrying after the connection recovers. A Quick Tunnel remains temporary; use a named tunnel with a stable hostname for a lasting connection.
+Use provider-supported backups or private pg_dump exports. Keep dumps and restore credentials outside Git. Check the database dashboard for the actual recovery window instead of assuming a free-tier guarantee. For future PostgreSQL migrations, load the private production environment and run backend/src/migrate.ts explicitly after backup and review.
 
-References: [Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/), [Vercel SQLite limitations](https://vercel.com/kb/guide/is-sqlite-supported-in-vercel), [Vercel Build Output API](https://vercel.com/docs/build-output-api).
+## Local development and the former tunnel
+
+SQLite remains supported with DATABASE_PATH and no DATABASE_URL; see the root README. After cutover, use an isolated development database. The tunnel helper remains available for explicitly chosen local demonstrations but is unnecessary for hosted production. Quick Tunnel hostnames expire and change; an expired address causes gateway errors even while the website loads. The frontend now explains service unavailability if a gateway returns text instead of JSON.

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npx --yes pnpm@11.25.0 install --frozen-lockfile --prod=false",
+  "buildCommand": "pnpm run build:backend",
+  "outputDirectory": "public",
+  "functions": { "api/index.ts": { "maxDuration": 300 } },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index.ts" }]
+}

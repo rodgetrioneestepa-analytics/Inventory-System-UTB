@@ -4,7 +4,6 @@ import { stdin, stdout } from 'node:process';
 import bcrypt from 'bcryptjs';
 import { Store, id, now } from './db.js';
 import { userSchema } from './schemas.js';
-
 async function hiddenPassword(): Promise<string> {
   if (!stdin.isTTY) throw new Error('Use ADMIN_PASSWORD for noninteractive setup.');
   stdout.write('Password (12–72 characters; hidden): ');
@@ -44,14 +43,14 @@ const name = process.env.ADMIN_NAME ?? (await rl.question('Admin display name: '
 rl.close();
 const password = process.env.ADMIN_PASSWORD ?? (await hiddenPassword());
 const b = userSchema.parse({ email, name, password, role: 'admin' });
-const s = new Store(process.env.DATABASE_PATH ?? './data/utb.sqlite');
+const s = new Store(process.env.DATABASE_URL ?? process.env.DATABASE_PATH ?? './data/utb.sqlite');
 try {
-  if (s.get('SELECT 1 FROM users WHERE email=? COLLATE NOCASE', b.email))
+  if (await s.get('SELECT 1 FROM users WHERE email=? COLLATE NOCASE', b.email))
     throw new Error('Account already exists. No account was changed.');
   const passwordHash = await bcrypt.hash(b.password, 12);
   const userId = id();
-  s.tx(() => {
-    s.run(
+  await s.tx(async () => {
+    await s.run(
       'INSERT INTO users VALUES (?,?,?,?,?,?,?)',
       userId,
       b.email,
@@ -61,9 +60,9 @@ try {
       1,
       now(),
     );
-    s.audit(userId, 'bootstrap-admin', 'user', userId, { email: b.email });
+    await s.audit(userId, 'bootstrap-admin', 'user', userId, { email: b.email });
   });
   console.info('Administrator created. No inventory or sales data was seeded.');
 } finally {
-  s.close();
+  await s.close();
 }

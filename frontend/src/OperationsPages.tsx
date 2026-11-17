@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Plus, Eye, Download, Printer, Check, RotateCcw, FileUp } from 'lucide-react';
-import { api, date, key, localNow, money, number, toISO } from './api';
+import { api, date, key, localNow, money, number, toISO, uploadCSV } from './api';
 import { PageHeader, useApp } from './App';
 import {
   Badge,
@@ -1064,12 +1064,7 @@ export function ImportsPage() {
     setError('');
     setPreview(undefined);
     try {
-      if (file.size > 20 * 1024 * 1024) throw new Error('File exceeds 20 MiB limit.');
-      const p = await api('/imports/preview', 'POST', {
-        kind,
-        filename: file.name,
-        content: await file.text(),
-      });
+      const p = await uploadCSV(kind, file);
       setPreview(p);
       ctx.refresh();
     } catch (e) {

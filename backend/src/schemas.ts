@@ -12,7 +12,7 @@ export const dateOnly = z
   );
 export const timestamp = z.iso
   .datetime({ offset: true })
-  .refine((s) => Date.parse(s) <= Date.now() + 300_000, 'Future operational dates are not allowed')
+  .refine((s) => Date.parse(s) <= Date.now() + 300000, 'Future operational dates are not allowed')
   .transform((s) => new Date(s).toISOString());
 export const eventFields = { key: text, reference: text, reason: text, occurred_at: timestamp };
 export const itemSchema = z

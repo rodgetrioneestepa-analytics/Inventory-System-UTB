@@ -1,4 +1,4 @@
-# Local API
+# Inventory API
 
 The frontend calls same-origin `/api`. JSON errors have `{ "error": "message", "details": ... }`. Validation failures use 422, conflicts use 409, missing authentication uses 401, and forbidden access uses 403. Collections return `{ rows, total, page, limit }`; `page` starts at 1 and `limit` is capped at 200. Search uses `q`.
 
@@ -37,8 +37,10 @@ Posting requests share these fields:
 }
 ```
 
-Use a new key for each distinct event. Retries of an identical request return `{ id, duplicate: true }`. Reusing a key with different contents is a conflict. Preview has no stock effect. Every confirmation revalidates within a SQLite `BEGIN IMMEDIATE` transaction.
+Use a new key for each distinct event. Retries of an identical request return `{ id, duplicate: true }`. Reusing a key with different contents is a conflict. Preview has no stock effect. Every confirmation revalidates within a database transaction: SQLite `BEGIN IMMEDIATE`, or PostgreSQL with a shared advisory lock and one connection per transaction.
 
 The exact request schemas are in `backend/src/schemas.ts`; the sale schema is used by both the form posting and operational importer. The service in `backend/src/ledger.ts` provides the transaction and stock invariants. SQL values are bound parameters. Table/column identifiers in queries come from fixed application code.
 
 Import preview takes `{ kind: "catalog" | "sales", filename, content }`. Content must parse as CSV; the filename must end in `.csv`. The application accepts JSON-transported CSV content rather than executing or storing uploaded files on disk. CSV contents are capped at 20 MiB and 150,000 records. All CSV exports escape cells and neutralize spreadsheet formula prefixes.
+
+Large browser uploads use admin-only `POST /imports/uploads` with `{ kind, filename, chunks }`, `PUT /imports/uploads/:id/chunks/:index` with `{ content }`, then `POST /imports/uploads/:id/preview`. Upload IDs are owned by their creator, at most three pending uploads per administrator, and expire after 30 minutes. Chunks are capped at 1 MiB; identical retries are safe and changed retries conflict. Completeness and the total byte limit are checked before preview. Preview still has no stock effect; confirm the resulting import separately.

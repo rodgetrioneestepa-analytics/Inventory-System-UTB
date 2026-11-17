@@ -53,6 +53,30 @@ export async function currentUser() {
   setCSRF(data.csrf);
   return data.user;
 }
+export async function uploadCSV(kind: string, file: File) {
+  if (file.size > 20 * 1024 * 1024) throw new Error('File exceeds 20 MiB limit.');
+  const content = await file.text();
+  if (new Blob([content]).size < 2 * 1024 * 1024)
+    return api('/imports/preview', 'POST', { kind, filename: file.name, content });
+  const chunks: string[] = [];
+  for (let start = 0; start < content.length;) {
+    let end = Math.min(start + 256 * 1024, content.length);
+    const final = content.charCodeAt(end - 1);
+    if (end < content.length && final >= 0xd800 && final <= 0xdbff) end--;
+    chunks.push(content.slice(start, end));
+    start = end;
+  }
+  const upload = await api<{ id: string }>('/imports/uploads', 'POST', {
+    kind,
+    filename: file.name,
+    chunks: chunks.length,
+  });
+  for (let index = 0; index < chunks.length; index++)
+    await api('/imports/uploads/' + upload.id + '/chunks/' + index, 'PUT', {
+      content: chunks[index],
+    });
+  return api('/imports/uploads/' + upload.id + '/preview', 'POST');
+}
 export const money = (n: number | null) =>
   n === null
     ? 'Not configured'

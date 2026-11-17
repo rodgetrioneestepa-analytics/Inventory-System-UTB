@@ -1,5 +1,5 @@
 param(
-  [Parameter(Position=0)][ValidateSet('dev','build','test','test:browser','test:deployment','start','tunnel','migrate','admin:create','catalog:import')][string]$Task='dev',
+  [Parameter(Position=0)][ValidateSet('dev','build','build:backend','test','test:postgres','test:cloud','test:browser','test:deployment','start','tunnel','migrate','migrate:cloud','admin:create','catalog:import')][string]$Task='dev',
   [Parameter(ValueFromRemainingArguments=$true)][string[]]$TaskArguments
 )
 $ErrorActionPreference='Stop'
@@ -20,11 +20,15 @@ switch($Task){
   'build'{& $nodePath node_modules/typescript/bin/tsc -p config/tsconfig.backend.json;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};& $nodePath node_modules/typescript/bin/tsc -p config/tsconfig.frontend.json;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};& $nodePath node_modules/vite/bin/vite.js build --config config/vite.config.ts}
   'dev'{& $nodePath node_modules/concurrently/dist/bin/concurrently.js -k 'tsx watch backend/src/index.ts' 'vite --config config/vite.config.ts --host 127.0.0.1'}
   'test'{& $nodePath --import tsx --test 'tests/backend/*.test.ts'}
+  'test:postgres'{& $nodePath --import tsx --test tests/postgres.test.ts}
+  'test:cloud'{& $nodePath --import tsx --test tests/cloud-storage.test.ts}
+  'build:backend'{& $nodePath node_modules/typescript/bin/tsc -p config/tsconfig.backend.json;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};& $nodePath node_modules/typescript/bin/tsc -p config/tsconfig.api.json --noEmit}
   'test:browser'{& $nodePath node_modules/@playwright/test/cli.js test --config config/playwright.config.ts}
   'test:deployment'{& $nodePath --test tests/deployment.test.mjs}
   'start'{& $nodePath --env-file-if-exists=.env dist/server/index.js}
   'tunnel'{& $nodePath scripts/local-tunnel.mjs @TaskArguments}
   'migrate'{& $nodePath --import tsx backend/src/migrate.ts}
+  'migrate:cloud'{& $nodePath --env-file=.local/cloud-postgres.env --import tsx scripts/migrate-sqlite-to-postgres.ts @TaskArguments}
   'admin:create'{& $nodePath --import tsx backend/src/admin.ts @TaskArguments}
   'catalog:import'{& $nodePath --import tsx backend/src/catalog.ts @TaskArguments}
 }

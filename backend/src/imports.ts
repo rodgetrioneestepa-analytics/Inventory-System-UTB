@@ -1,10 +1,10 @@
+import { forEachAsync } from './db.js';
 import { parse } from 'csv-parse';
 import { Readable } from 'node:stream';
 import { Store, id, now, hash, type Row } from './db.js';
 import { Ledger, rounded } from './ledger.js';
 import { AppError, requireThat } from './errors.js';
 import { saleSchema, type Sale } from './schemas.js';
-
 export const normalizeName = (name: string) =>
   name.normalize('NFKC').trim().toLocaleLowerCase('en-PH').replace(/\s+/g, ' ');
 export const csvCell = (value: unknown) => {
@@ -72,14 +72,15 @@ export class Imports {
     public s: Store,
     public ledger: Ledger,
   ) {}
-  catalogPreview(rows: Row[]) {
+  async catalogPreview(rows: Row[]) {
     const unique = new Map<string, Row>();
     const errors: Row[] = [];
     const categories = new Set<string>();
     const existingProducts = new Map(
-      this.s
-        .all('SELECT normalized_name,category FROM menu_products')
-        .map((p) => [p.normalized_name, p]),
+      (await this.s.all('SELECT normalized_name,category FROM menu_products')).map((p) => [
+        p.normalized_name,
+        p,
+      ]),
     );
     const sourceNames = new Set<string>();
     rows.forEach((row, i) => {
@@ -129,21 +130,21 @@ export class Imports {
       errors,
     };
   }
-  salesPreview(rows: Row[], importHash: string) {
+  async salesPreview(rows: Row[], importHash: string) {
     const groups = new Map<string, Sale>();
     const errors: Row[] = [];
     const seen = new Set<string>();
-    rows.forEach((row, i) => {
+    await forEachAsync(rows, async (row, i) => {
       try {
         requireThat(String(row.TransactionID ?? '').trim(), 'TransactionID is required');
         const sourceKey = `${row.TransactionID}\u001f${row.LineNumber}`;
         requireThat(!seen.has(sourceKey), 'Duplicate transaction/line key in file');
         seen.add(sourceKey);
         requireThat(
-          !this.s.get('SELECT 1 FROM operational_sale_lines WHERE source_key=?', sourceKey),
+          !(await this.s.get('SELECT 1 FROM operational_sale_lines WHERE source_key=?', sourceKey)),
           'Overlapping transaction/line already posted',
         );
-        const product = this.s.get(
+        const product = await this.s.get(
           'SELECT id FROM menu_products WHERE id=? OR sku=?',
           row.ProductSKUorID,
           row.ProductSKUorID,
@@ -186,7 +187,7 @@ export class Imports {
     const consumption = new Map<string, Row>();
     for (const body of groups.values()) {
       try {
-        const preview = this.ledger.previewSale(body);
+        const preview = await this.ledger.previewSale(body);
         for (const c of preview.consumption) {
           const prior = consumption.get(c.item_id);
           consumption.set(c.item_id, {
@@ -225,8 +226,12 @@ export class Imports {
     );
     requireThat(Buffer.byteLength(content) <= 20 * 1024 * 1024, 'CSV exceeds 20 MiB limit', 413);
     const digest = hash(content);
-    const existing = this.s.get('SELECT id FROM imports WHERE kind=? AND hash=?', kind, digest);
-    if (existing) return this.detail(existing.id);
+    const existing = await this.s.get(
+      'SELECT id FROM imports WHERE kind=? AND hash=?',
+      kind,
+      digest,
+    );
+    if (existing) return await this.detail(existing.id);
     const required =
       kind === 'catalog'
         ? ['ProductName', 'Category']
@@ -246,12 +251,18 @@ export class Imports {
         ? rows.map((row) => ({ ProductName: row.ProductName, Category: row.Category }))
         : rows;
     const preview =
-      kind === 'catalog' ? this.catalogPreview(safeRows) : this.salesPreview(safeRows, digest);
-    const importId = this.s.tx(() => {
-      const raced = this.s.get('SELECT id FROM imports WHERE kind=? AND hash=?', kind, digest);
+      kind === 'catalog'
+        ? await this.catalogPreview(safeRows)
+        : await this.salesPreview(safeRows, digest);
+    const importId = await this.s.tx(async () => {
+      const raced = await this.s.get(
+        'SELECT id FROM imports WHERE kind=? AND hash=?',
+        kind,
+        digest,
+      );
       if (raced) return raced.id as string;
       const newId = id();
-      this.s.run(
+      await this.s.run(
         'INSERT INTO imports VALUES (?,?,?,?,?,?,?,?,?,?)',
         newId,
         kind,
@@ -267,20 +278,23 @@ export class Imports {
       const rowErrors = new Map<number, string[]>();
       for (const e of preview.errors)
         rowErrors.set(e.row, [...(rowErrors.get(e.row) ?? []), e.reason]);
-      for (let i = 0; i < safeRows.length; i++) {
-        const row = safeRows[i];
+      const importRows = safeRows.map((row, i) => {
         const error = (rowErrors.get(i + 2) ?? []).join('; ');
-        this.s.run(
-          'INSERT INTO import_rows VALUES (?,?,?,?,?,?)',
+        return [
           id(),
           newId,
           i + 2,
           kind === 'catalog' ? row.ProductName : `${row.TransactionID}:${row.LineNumber}`,
           error || null,
           JSON.stringify(row),
-        );
-      }
-      this.s.audit(actor, 'upload', 'import', newId, {
+        ];
+      });
+      await this.s.insertRows(
+        'import_rows',
+        ['id', 'import_id', 'row_number', 'source_reference', 'error', 'row_data'],
+        importRows,
+      );
+      await this.s.audit(actor, 'upload', 'import', newId, {
         kind,
         filename,
         hash: digest,
@@ -288,18 +302,24 @@ export class Imports {
       });
       return newId;
     });
-    return this.detail(importId);
+    return await this.detail(importId);
   }
-  detail(importId: string): Row & { summary: Row; preview: Row; error_count: number } {
-    const row = this.s.get('SELECT * FROM imports WHERE id=?', importId);
+  async detail(importId: string): Promise<
+    Row & {
+      summary: Row;
+      preview: Row;
+      error_count: number;
+    }
+  > {
+    const row = await this.s.get('SELECT * FROM imports WHERE id=?', importId);
     requireThat(row, 'Import not found', 404);
     const rows = JSON.parse(row.payload) as Row[];
     const preview =
       row.status === 'confirmed'
         ? { summary: JSON.parse(row.summary), errors: [], confirmed: true }
         : row.kind === 'catalog'
-          ? this.catalogPreview(rows)
-          : this.salesPreview(rows, row.hash);
+          ? await this.catalogPreview(rows)
+          : await this.salesPreview(rows, row.hash);
     const { payload, ...metadata } = row;
     return {
       ...metadata,
@@ -308,28 +328,28 @@ export class Imports {
       error_count: preview.errors.length,
     };
   }
-  confirm(importId: string, actor: string) {
-    return this.s.tx(() => {
-      const imported = this.s.get('SELECT * FROM imports WHERE id=?', importId);
+  async confirm(importId: string, actor: string) {
+    return await this.s.tx(async () => {
+      const imported = await this.s.get('SELECT * FROM imports WHERE id=?', importId);
       requireThat(imported, 'Import not found', 404);
       if (imported.status === 'confirmed') return { id: importId, duplicate: true };
       const rows = JSON.parse(imported.payload) as Row[];
       const preview =
         imported.kind === 'catalog'
-          ? this.catalogPreview(rows)
-          : this.salesPreview(rows, imported.hash);
+          ? await this.catalogPreview(rows)
+          : await this.salesPreview(rows, imported.hash);
       requireThat(!preview.errors.length, 'Resolve all import errors before confirmation', 422);
       if (imported.kind === 'catalog') {
-        const catalog = this.catalogPreview(rows);
+        const catalog = await this.catalogPreview(rows);
         for (const product of catalog.products) {
           if (
-            !this.s.get(
+            !(await this.s.get(
               'SELECT 1 FROM menu_products WHERE normalized_name=?',
               product.normalized_name,
-            )
+            ))
           ) {
             const productId = id();
-            this.s.run(
+            await this.s.run(
               'INSERT INTO menu_products VALUES (?,?,?,?,?,?,?)',
               productId,
               `MENU-${productId.slice(0, 8).toUpperCase()}`,
@@ -342,26 +362,28 @@ export class Imports {
           }
         }
       } else
-        for (const sale of this.salesPreview(rows, imported.hash).sales)
-          this.ledger.saleInside(sale, actor, `import:${importId}`);
-      this.s.run(
+        for (const sale of (await this.salesPreview(rows, imported.hash)).sales)
+          await this.ledger.saleInside(sale, actor, `import:${importId}`);
+      await this.s.run(
         'UPDATE imports SET status=?,confirmed_at=?,summary=? WHERE id=?',
         'confirmed',
         now(),
         JSON.stringify(preview.summary),
         importId,
       );
-      this.s.audit(actor, 'confirm', 'import', importId, preview.summary);
+      await this.s.audit(actor, 'confirm', 'import', importId, preview.summary);
       return { id: importId, duplicate: false };
     });
   }
-  rejected(importId: string) {
-    const row = this.s.get('SELECT * FROM imports WHERE id=?', importId);
+  async rejected(importId: string) {
+    const row = await this.s.get('SELECT * FROM imports WHERE id=?', importId);
     requireThat(row, 'Import not found', 404);
     if (row.status === 'confirmed') return csv([]);
     const rows = JSON.parse(row.payload);
     const preview =
-      row.kind === 'catalog' ? this.catalogPreview(rows) : this.salesPreview(rows, row.hash);
+      row.kind === 'catalog'
+        ? await this.catalogPreview(rows)
+        : await this.salesPreview(rows, row.hash);
     return csv(preview.errors);
   }
 }

@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import { Store } from './db.js';
 import { createApp } from './app.js';
-const store = new Store(process.env.DATABASE_PATH ?? './data/utb.sqlite');
+const store = new Store(
+  process.env.DATABASE_URL ?? process.env.DATABASE_PATH ?? './data/utb.sqlite',
+);
 const server = createApp(store).listen(
   Number(process.env.PORT ?? 3001),
   process.env.HOST ?? '127.0.0.1',
@@ -11,8 +13,8 @@ const server = createApp(store).listen(
     ),
 );
 function close() {
-  server.close(() => {
-    store.close();
+  server.close(async () => {
+    await store.close();
     process.exit(0);
   });
 }

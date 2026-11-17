@@ -2,9 +2,9 @@
 
 Inventory System for UTB
 
-Under the Balete Inventory is a working React/TypeScript application backed by Express and SQLite. It includes inventory setup, menu and versioned recipes, suppliers, purchasing and partial receiving, an append-only stock ledger, wastage, physical counts, genuine operational sales, separate CSV import previews, reports and account administration.
+Under the Balete Inventory is a working React/TypeScript application backed by Express, with PostgreSQL for cloud hosting and SQLite for local development. It includes inventory setup, menu and versioned recipes, suppliers, purchasing and partial receiving, an append-only stock ledger, wastage, physical counts, genuine operational sales, separate CSV import previews, reports and account administration.
 
-Website: [under-the-balete-inventory.vercel.app](https://under-the-balete-inventory.vercel.app). The backend and database run on the owner's computer through a secure tunnel, so that computer and tunnel must remain running. See [deployment instructions](docs/DEPLOYMENT.md) for restarting or reconnecting it.
+Website: [under-the-balete-inventory.vercel.app](https://under-the-balete-inventory.vercel.app). Cloud hosting uses Vercel Functions and Neon PostgreSQL, replacing the temporary local tunnel. See [deployment instructions](docs/DEPLOYMENT.md) for configuration, data-preserving migration and verification.
 
 Synthetic, undated POS exports are **catalog-only**. The supplied export has 151 normalized menu names from 153 source spellings across 25 categories. It creates no operational sales, prices, stock or costs. See [data boundaries and operating rules](docs/DATA_AND_OPERATIONS.md).
 
@@ -33,7 +33,7 @@ On Windows, the PowerShell runner uses the installed Node runtime and project de
 .\scripts\run.ps1 dev
 ```
 
-The runner also supports `build`, `start`, `test`, `test:browser`, `test:deployment`, `tunnel`, `migrate` and `catalog:import`. If PowerShell's execution policy blocks a local script, use a process-scoped invocation: `powershell -ExecutionPolicy Bypass -File .\scripts\run.ps1 dev`.
+The runner also supports `build`, `build:backend`, `start`, `test`, `test:postgres`, `test:cloud`, `test:browser`, `test:deployment`, `tunnel`, `migrate`, `migrate:cloud` and `catalog:import`. If PowerShell's execution policy blocks a local script, use a process-scoped invocation: `powershell -ExecutionPolicy Bypass -File .\scripts\run.ps1 dev`.
 
 ## Catalog import
 
@@ -62,7 +62,7 @@ Owner/Admin can configure and post all workflows. Inventory Staff can view stock
 
 ## Production build and local serving
 
-For online hosting, see [Vercel website with a local backend and database](docs/DEPLOYMENT.md). The database can remain on this computer while a secure HTTPS tunnel connects the Vercel frontend to the Node.js backend. The computer, backend and tunnel must stay running.
+For online hosting, see [Vercel frontend and API with Neon PostgreSQL](docs/DEPLOYMENT.md). The hosted API requires a server-only `DATABASE_URL`; local development uses SQLite when that variable is absent. After a verified cloud cutover, the retired local database is preserved as a backup and protected from accidental reuse. Choose a separate `DATABASE_PATH` for new local development.
 
 ```powershell
 npm run build
@@ -79,6 +79,9 @@ Set `DATABASE_PATH` to a non-synced local server disk before ongoing production 
 ```powershell
 npm test
 npm run build
+npm run build:backend
+npm run test:postgres
+npm run test:cloud
 npm run test:browser
 npm run test:deployment
 ```
@@ -93,7 +96,7 @@ npm test
 Remove-Item Env:UTB_CATALOG_SOURCE
 ```
 
-Without that variable, only the private-source test is explicitly skipped. The other tests use isolated labeled fixtures to verify posting, imports, permissions, account safeguards and persistence.
+Without that variable, only the private-source test is explicitly skipped. PostgreSQL workflow tests use isolated PGlite databases running the PostgreSQL engine; cloud storage tests cover migration, staged uploads and shared limits. The other tests use isolated labeled fixtures to verify posting, imports, permissions, account safeguards and persistence.
 
 ## Project layout
 
@@ -101,7 +104,9 @@ Without that variable, only the private-source test is explicitly skipped. The o
 frontend/           Responsive React application and forms
 backend/src/        Auth, validated REST API, ledger, imports and CLIs
 shared/             Shared transport types
-database/migrations/ Versioned forward SQL migrations
+database/migrations/ Local SQLite forward migrations
+database/postgres/  Hosted PostgreSQL forward migrations
+api/                Vercel Express entry point
 tests/
   backend/          Ledger and backend integration tests
   browser/          Playwright browser workflows

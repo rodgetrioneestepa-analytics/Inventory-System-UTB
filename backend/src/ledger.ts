@@ -1,3 +1,4 @@
+import { mapAsync } from './db.js';
 import { Store, id, now, hash, type Row } from './db.js';
 import { requireThat, AppError } from './errors.js';
 import {
@@ -9,7 +10,6 @@ import {
   reversalSchema,
   type Sale,
 } from './schemas.js';
-
 const EPS = 0.0000001;
 export const rounded = (x: number) => Math.round(x * 1e6) / 1e6;
 export const manilaDay = () =>
@@ -21,17 +21,17 @@ export const manilaDay = () =>
   }).format(new Date());
 export class Ledger {
   constructor(public s: Store) {}
-  item(itemId: string, requireOpening = true) {
-    const item = this.s.get('SELECT * FROM inventory_items WHERE id=?', itemId);
+  async item(itemId: string, requireOpening = true) {
+    const item = await this.s.get('SELECT * FROM inventory_items WHERE id=?', itemId);
     requireThat(item && !item.archived, 'Inventory item is missing or archived');
     if (requireOpening)
       requireThat(
-        this.s.get('SELECT 1 FROM opening_events WHERE item_id=?', itemId),
+        await this.s.get('SELECT 1 FROM opening_events WHERE item_id=?', itemId),
         `${item.name}: opening stock not configured`,
       );
     return item;
   }
-  convert(item: Row, quantity: number, unit: string) {
+  async convert(item: Row, quantity: number, unit: string) {
     const checked = (value: number) => {
       const result = rounded(value);
       requireThat(
@@ -44,7 +44,7 @@ export class Ledger {
     if ((unit === 'kg' && item.base_unit === 'g') || (unit === 'l' && item.base_unit === 'ml'))
       return checked(quantity * 1000);
     if (unit === 'pack') {
-      const c = this.s.get(
+      const c = await this.s.get(
         'SELECT factor FROM unit_conversions WHERE item_id=? AND from_unit=?',
         item.id,
         unit,
@@ -57,18 +57,18 @@ export class Ledger {
       `${item.name}: incompatible or missing unit conversion (${unit} to ${item.base_unit})`,
     );
   }
-  batches(itemId: string) {
-    return this.s.all(
+  async batches(itemId: string) {
+    return await this.s.all(
       `SELECT b.*, COALESCE(SUM(m.quantity),0) quantity FROM stock_batches b
       LEFT JOIN stock_movements m ON m.batch_id=b.id WHERE b.item_id=? GROUP BY b.id
       ORDER BY COALESCE(b.expiry_date,'9999-12-31'),b.created_at,b.id`,
       itemId,
     );
   }
-  balances(itemId: string) {
-    if (!this.s.get('SELECT 1 FROM opening_events WHERE item_id=?', itemId))
+  async balances(itemId: string) {
+    if (!(await this.s.get('SELECT 1 FROM opening_events WHERE item_id=?', itemId)))
       return { balance: null, available: null, expired: null };
-    const batches = this.batches(itemId);
+    const batches = await this.batches(itemId);
     const expired = batches
       .filter((b) => b.expiry_date && b.expiry_date < manilaDay())
       .reduce((n, b) => n + b.quantity, 0);
@@ -79,9 +79,9 @@ export class Ledger {
       expired: rounded(expired),
     };
   }
-  allocate(itemId: string, quantity: number, allowExpired = false, batchId?: string) {
-    this.item(itemId);
-    const batches = this.batches(itemId).filter(
+  async allocate(itemId: string, quantity: number, allowExpired = false, batchId?: string) {
+    await this.item(itemId);
+    const batches = (await this.batches(itemId)).filter(
       (b) =>
         b.quantity > EPS &&
         (!batchId || b.id === batchId) &&
@@ -90,7 +90,10 @@ export class Ledger {
     const available = batches.reduce((n, b) => n + b.quantity, 0);
     requireThat(available + EPS >= quantity, 'Insufficient available stock', 409);
     let remaining = quantity;
-    const allocations: { batch_id: string; quantity: number }[] = [];
+    const allocations: {
+      batch_id: string;
+      quantity: number;
+    }[] = [];
     for (const b of batches) {
       if (remaining <= EPS) break;
       const take = rounded(Math.min(remaining, b.quantity));
@@ -99,14 +102,14 @@ export class Ledger {
     }
     return allocations;
   }
-  movement(
+  async movement(
     event: string,
     item: string,
     batch: string,
     quantity: number,
     reverses: string | null = null,
   ) {
-    this.s.run(
+    await this.s.run(
       'INSERT INTO stock_movements VALUES (?,?,?,?,?,?)',
       id(),
       event,
@@ -116,14 +119,14 @@ export class Ledger {
       reverses,
     );
   }
-  batch(item: Row, label: string, expiry: string | null) {
+  async batch(item: Row, label: string, expiry: string | null) {
     requireThat(!item.expiry_tracking || expiry, `${item.name}: expiry date is required`);
     requireThat(
       item.expiry_tracking || !expiry,
       'Enable expiry tracking before entering an expiry date',
     );
     const batchId = id();
-    this.s.run(
+    await this.s.run(
       'INSERT INTO stock_batches VALUES (?,?,?,?,?)',
       batchId,
       item.id,
@@ -134,7 +137,7 @@ export class Ledger {
     return batchId;
   }
   // Call only inside a transaction, or via post(). The same key with changed input is rejected.
-  event(
+  async event(
     kind: string,
     body: Row,
     actor: string,
@@ -143,7 +146,10 @@ export class Ledger {
     reverses: string | null = null,
   ) {
     const requestHash = hash(JSON.stringify({ kind, body, reverses }));
-    const existing = this.s.get('SELECT * FROM posted_events WHERE idempotency_key=?', body.key);
+    const existing = await this.s.get(
+      'SELECT * FROM posted_events WHERE idempotency_key=?',
+      body.key,
+    );
     if (existing) {
       requireThat(
         existing.request_hash === requestHash,
@@ -153,7 +159,7 @@ export class Ledger {
       return { id: existing.id, duplicate: true };
     }
     const eventId = id();
-    this.s.run(
+    await this.s.run(
       'INSERT INTO posted_events VALUES (?,?,?,?,?,?,?,?,?,?,?)',
       eventId,
       kind,
@@ -167,15 +173,15 @@ export class Ledger {
       now(),
       reverses,
     );
-    work(eventId);
-    this.s.audit(actor, 'post', kind, eventId, {
+    await work(eventId);
+    await this.s.audit(actor, 'post', kind, eventId, {
       reference: body.reference,
       reason: body.reason,
       source,
     });
     return { id: eventId, duplicate: false };
   }
-  post(
+  async post(
     kind: string,
     body: Row,
     actor: string,
@@ -183,30 +189,40 @@ export class Ledger {
     work: (eventId: string) => void,
     reverses: string | null = null,
   ) {
-    return this.s.tx(() => this.event(kind, body, actor, source, work, reverses));
+    return await this.s.tx(async () => await this.event(kind, body, actor, source, work, reverses));
   }
-  opening(itemId: string, raw: unknown, actor: string) {
+  async opening(itemId: string, raw: unknown, actor: string) {
     const body = openingSchema.parse(raw);
-    return this.post('opening', { ...body, item_id: itemId }, actor, 'opening-form', (eventId) => {
-      const item = this.item(itemId, false);
-      requireThat(
-        !this.s.get('SELECT 1 FROM opening_events WHERE item_id=?', itemId),
-        'Opening stock already configured',
-        409,
-      );
-      const quantity = this.convert(item, body.quantity, body.unit);
-      const batchId = this.batch(item, body.batch_label, body.expiry_date);
-      this.s.run('INSERT INTO opening_events VALUES (?,?)', itemId, eventId);
-      this.movement(eventId, itemId, batchId, quantity);
-    });
+    return await this.post(
+      'opening',
+      { ...body, item_id: itemId },
+      actor,
+      'opening-form',
+      async (eventId) => {
+        const item = await this.item(itemId, false);
+        requireThat(
+          !(await this.s.get('SELECT 1 FROM opening_events WHERE item_id=?', itemId)),
+          'Opening stock already configured',
+          409,
+        );
+        const quantity = await this.convert(item, body.quantity, body.unit);
+        const batchId = await this.batch(item, body.batch_label, body.expiry_date);
+        await this.s.run('INSERT INTO opening_events VALUES (?,?)', itemId, eventId);
+        await this.movement(eventId, itemId, batchId, quantity);
+      },
+    );
   }
-  poDetail(poId: string): Row & { lines: Row[] } {
-    const po = this.s.get(
+  async poDetail(poId: string): Promise<
+    Row & {
+      lines: Row[];
+    }
+  > {
+    const po = await this.s.get(
       'SELECT p.*,s.name supplier_name FROM purchase_orders p JOIN suppliers s ON s.id=p.supplier_id WHERE p.id=?',
       poId,
     );
     requireThat(po, 'Purchase order not found', 404);
-    const lines = this.s.all(
+    const lines = await this.s.all(
       `SELECT l.*,i.name,i.sku,i.base_unit,i.expiry_tracking,
       COALESCE((SELECT SUM(rl.quantity) FROM receipt_lines rl JOIN receipts r ON r.id=rl.receipt_id
       WHERE rl.po_line_id=l.id AND NOT EXISTS (SELECT 1 FROM posted_events e WHERE e.reverses_event_id=r.id)),0) received
@@ -218,80 +234,92 @@ export class Ledger {
       lines: lines.map((l) => ({ ...l, remaining: rounded(Math.max(0, l.quantity - l.received)) })),
     };
   }
-  refreshPO(poId: string) {
-    const po = this.poDetail(poId);
+  async refreshPO(poId: string) {
+    const po = await this.poDetail(poId);
     const complete = po.lines.every((l) => l.received + EPS >= l.quantity);
     const any = po.lines.some((l) => l.received > EPS);
-    this.s.run(
+    await this.s.run(
       'UPDATE purchase_orders SET status=? WHERE id=?',
       complete ? 'complete' : any ? 'partial' : 'ordered',
       poId,
     );
   }
-  receive(poId: string, raw: unknown, actor: string, role: string) {
+  async receive(poId: string, raw: unknown, actor: string, role: string) {
     const body = receiptSchema.parse(raw);
-    return this.post('receipt', { ...body, po_id: poId }, actor, 'receiving-form', (eventId) => {
-      const po = this.poDetail(poId);
-      requireThat(
-        ['ordered', 'partial', 'complete'].includes(po.status),
-        'Submit the purchase order before receiving',
-      );
-      requireThat(
-        !this.s.get('SELECT 1 FROM receipts WHERE delivery_reference=?', body.delivery_reference),
-        'Delivery reference already received',
-        409,
-      );
-      requireThat(
-        new Set(body.lines.map((l) => l.po_line_id)).size === body.lines.length,
-        'Duplicate receipt lines',
-      );
-      this.s.run(
-        'INSERT INTO receipts VALUES (?,?,?,?)',
-        eventId,
-        poId,
-        body.delivery_reference,
-        body.over_receipt_reason ?? null,
-      );
-      for (const line of body.lines) {
-        const pol = po.lines.find((l) => l.id === line.po_line_id);
-        requireThat(pol, 'Purchase order line not found');
-        const item = this.item(pol.item_id);
-        const quantity = this.convert(item, line.quantity, line.unit);
-        if (quantity > pol.remaining + EPS)
-          requireThat(
-            role === 'admin' && body.over_receipt_reason,
-            'Over-receipt needs an admin exception and reason',
-            403,
-          );
-        const batchId = this.batch(item, line.batch_label, line.expiry_date);
-        this.s.run(
-          'INSERT INTO receipt_lines VALUES (?,?,?,?,?,?)',
-          id(),
-          eventId,
-          pol.id,
-          batchId,
-          quantity,
-          pol.unit_cost,
+    return await this.post(
+      'receipt',
+      { ...body, po_id: poId },
+      actor,
+      'receiving-form',
+      async (eventId) => {
+        const po = await this.poDetail(poId);
+        requireThat(
+          ['ordered', 'partial', 'complete'].includes(po.status),
+          'Submit the purchase order before receiving',
         );
-        this.movement(eventId, item.id, batchId, quantity);
-      }
-      this.refreshPO(poId);
-    });
+        requireThat(
+          !(await this.s.get(
+            'SELECT 1 FROM receipts WHERE delivery_reference=?',
+            body.delivery_reference,
+          )),
+          'Delivery reference already received',
+          409,
+        );
+        requireThat(
+          new Set(body.lines.map((l) => l.po_line_id)).size === body.lines.length,
+          'Duplicate receipt lines',
+        );
+        await this.s.run(
+          'INSERT INTO receipts VALUES (?,?,?,?)',
+          eventId,
+          poId,
+          body.delivery_reference,
+          body.over_receipt_reason ?? null,
+        );
+        for (const line of body.lines) {
+          const pol = po.lines.find((l) => l.id === line.po_line_id);
+          requireThat(pol, 'Purchase order line not found');
+          const item = await this.item(pol.item_id);
+          const quantity = await this.convert(item, line.quantity, line.unit);
+          if (quantity > pol.remaining + EPS)
+            requireThat(
+              role === 'admin' && body.over_receipt_reason,
+              'Over-receipt needs an admin exception and reason',
+              403,
+            );
+          const batchId = await this.batch(item, line.batch_label, line.expiry_date);
+          await this.s.run(
+            'INSERT INTO receipt_lines VALUES (?,?,?,?,?,?)',
+            id(),
+            eventId,
+            pol.id,
+            batchId,
+            quantity,
+            pol.unit_cost,
+          );
+          await this.movement(eventId, item.id, batchId, quantity);
+        }
+        await this.refreshPO(poId);
+      },
+    );
   }
-  previewSale(raw: unknown) {
+  async previewSale(raw: unknown) {
     const body = saleSchema.parse(raw);
     requireThat(
       new Set(body.lines.map((l) => l.line_number)).size === body.lines.length,
       'Duplicate line numbers',
     );
     requireThat(
-      !this.s.get('SELECT 1 FROM operational_sales WHERE transaction_reference=?', body.reference),
+      !(await this.s.get(
+        'SELECT 1 FROM operational_sales WHERE transaction_reference=?',
+        body.reference,
+      )),
       'Transaction already posted or overlaps a previous import',
       409,
     );
     const requirements = new Map<string, number>();
-    const resolved = body.lines.map((line) => {
-      const product = this.s.get(
+    const resolved = await mapAsync(body.lines, async (line) => {
+      const product = await this.s.get(
         'SELECT * FROM menu_products WHERE id=? AND archived=0',
         line.product_id,
       );
@@ -305,18 +333,18 @@ export class Ledger {
           0.01000001,
         'Qty × UnitPrice differs from SalesAmount (tolerance ₱0.01)',
       );
-      const version = this.s.get(
+      const version = await this.s.get(
         `SELECT v.* FROM recipe_versions v JOIN recipes r ON r.id=v.recipe_id WHERE r.product_id=? ORDER BY version DESC LIMIT 1`,
         product.id,
       );
       requireThat(version, `${product.source_name}: recipe not configured`);
-      const ingredients = this.s.all(
+      const ingredients = await this.s.all(
         'SELECT * FROM recipe_ingredients WHERE version_id=?',
         version.id,
       );
       requireThat(ingredients.length, 'Recipe has no ingredients');
       for (const ingredient of ingredients) {
-        const item = this.item(ingredient.item_id);
+        const item = await this.item(ingredient.item_id);
         requireThat(ingredient.base_unit === item.base_unit, 'Recipe base unit mismatch');
         const required = rounded(ingredient.quantity * line.quantity);
         requireThat(
@@ -327,7 +355,7 @@ export class Ledger {
       }
       const sourceKey = `${body.reference}\u001f${line.line_number}`;
       requireThat(
-        !this.s.get('SELECT 1 FROM operational_sale_lines WHERE source_key=?', sourceKey),
+        !(await this.s.get('SELECT 1 FROM operational_sale_lines WHERE source_key=?', sourceKey)),
         'Source line overlaps an existing sale',
         409,
       );
@@ -338,9 +366,9 @@ export class Ledger {
         product_name: product.source_name,
       };
     });
-    const consumption = [...requirements].map(([itemId, quantity]) => {
-      const item = this.item(itemId);
-      const balances = this.balances(itemId);
+    const consumption = await mapAsync([...requirements], async ([itemId, quantity]) => {
+      const item = await this.item(itemId);
+      const balances = await this.balances(itemId);
       const shortage = rounded(Math.max(0, quantity - (balances.available ?? 0)));
       return {
         item_id: itemId,
@@ -349,23 +377,23 @@ export class Ledger {
         quantity,
         available: balances.available,
         shortage,
-        batches: shortage > EPS ? [] : this.allocate(itemId, quantity),
+        batches: shortage > EPS ? [] : await this.allocate(itemId, quantity),
       };
     });
     return { body, resolved, consumption, can_post: consumption.every((c) => c.shortage <= EPS) };
   }
-  saleInside(body: Sale, actor: string, source: string) {
-    return this.event('sale', body, actor, source, (eventId) => {
-      const preview = this.previewSale(body);
+  async saleInside(body: Sale, actor: string, source: string) {
+    return await this.event('sale', body, actor, source, async (eventId) => {
+      const preview = await this.previewSale(body);
       requireThat(preview.can_post, 'Insufficient available stock', 409);
-      this.s.run(
+      await this.s.run(
         'INSERT INTO operational_sales VALUES (?,?,?)',
         eventId,
         body.reference,
         body.occurred_at,
       );
       for (const line of preview.resolved)
-        this.s.run(
+        await this.s.run(
           'INSERT INTO operational_sale_lines VALUES (?,?,?,?,?,?,?,?,?)',
           id(),
           eventId,
@@ -378,37 +406,43 @@ export class Ledger {
           line.source_key,
         );
       for (const c of preview.consumption)
-        for (const b of c.batches) this.movement(eventId, c.item_id, b.batch_id, -b.quantity);
+        for (const b of c.batches) await this.movement(eventId, c.item_id, b.batch_id, -b.quantity);
     });
   }
-  sale(raw: unknown, actor: string, source = 'sale-form') {
+  async sale(raw: unknown, actor: string, source = 'sale-form') {
     const body = saleSchema.parse(raw);
-    return this.s.tx(() => this.saleInside(body, actor, source));
+    return await this.s.tx(async () => await this.saleInside(body, actor, source));
   }
-  waste(raw: unknown, actor: string) {
+  async waste(raw: unknown, actor: string) {
     const body = wasteSchema.parse(raw);
-    return this.post('wastage', body, actor, 'wastage-form', (eventId) => {
-      this.s.run('INSERT INTO wastage VALUES (?,?)', eventId, body.category);
+    return await this.post('wastage', body, actor, 'wastage-form', async (eventId) => {
+      await this.s.run('INSERT INTO wastage VALUES (?,?)', eventId, body.category);
       for (const line of body.lines) {
-        const item = this.item(line.item_id);
-        const quantity = this.convert(item, line.quantity, line.unit);
-        const allocations = this.allocate(item.id, quantity, true, line.batch_id);
-        this.s.run('INSERT INTO wastage_lines VALUES (?,?,?,?)', id(), eventId, item.id, quantity);
-        for (const b of allocations) this.movement(eventId, item.id, b.batch_id, -b.quantity);
+        const item = await this.item(line.item_id);
+        const quantity = await this.convert(item, line.quantity, line.unit);
+        const allocations = await this.allocate(item.id, quantity, true, line.batch_id);
+        await this.s.run(
+          'INSERT INTO wastage_lines VALUES (?,?,?,?)',
+          id(),
+          eventId,
+          item.id,
+          quantity,
+        );
+        for (const b of allocations) await this.movement(eventId, item.id, b.batch_id, -b.quantity);
       }
     });
   }
-  previewCount(raw: unknown) {
+  async previewCount(raw: unknown) {
     const body = countSchema.parse(raw);
     requireThat(
       new Set(body.lines.map((l) => l.batch_id)).size === body.lines.length,
       'Duplicate counted batches',
     );
-    const lines = body.lines.map((line) => {
-      const item = this.item(line.item_id);
-      const batch = this.batches(item.id).find((b) => b.id === line.batch_id);
+    const lines = await mapAsync(body.lines, async (line) => {
+      const item = await this.item(line.item_id);
+      const batch = (await this.batches(item.id)).find((b) => b.id === line.batch_id);
       requireThat(batch, 'Batch not found for item');
-      const counted = this.convert(item, line.counted, line.unit);
+      const counted = await this.convert(item, line.counted, line.unit);
       requireThat(
         Math.abs(batch.quantity - line.expected_book) < EPS,
         'Stock changed since count preview; refresh the book balance',
@@ -424,13 +458,13 @@ export class Ledger {
     });
     return { lines };
   }
-  count(raw: unknown, actor: string) {
+  async count(raw: unknown, actor: string) {
     const body = countSchema.parse(raw);
-    return this.post('count', body, actor, 'count-form', (eventId) => {
-      const preview = this.previewCount(body);
-      this.s.run('INSERT INTO stock_counts VALUES (?)', eventId);
+    return await this.post('count', body, actor, 'count-form', async (eventId) => {
+      const preview = await this.previewCount(body);
+      await this.s.run('INSERT INTO stock_counts VALUES (?)', eventId);
       for (const line of preview.lines) {
-        this.s.run(
+        await this.s.run(
           'INSERT INTO stock_count_lines VALUES (?,?,?,?,?,?)',
           id(),
           eventId,
@@ -439,19 +473,19 @@ export class Ledger {
           line.book,
           line.counted,
         );
-        this.movement(eventId, line.item_id, line.batch_id, line.delta);
+        await this.movement(eventId, line.item_id, line.batch_id, line.delta);
       }
     });
   }
-  reverse(eventId: string, raw: unknown, actor: string) {
+  async reverse(eventId: string, raw: unknown, actor: string) {
     const body = reversalSchema.parse(raw);
-    return this.post(
+    return await this.post(
       'reversal',
       body,
       actor,
       'reversal-form',
-      (newEvent) => {
-        const original = this.s.get('SELECT * FROM posted_events WHERE id=?', eventId);
+      async (newEvent) => {
+        const original = await this.s.get('SELECT * FROM posted_events WHERE id=?', eventId);
         requireThat(original, 'Event not found', 404);
         requireThat(
           ['receipt', 'sale', 'wastage', 'count'].includes(original.kind),
@@ -459,27 +493,32 @@ export class Ledger {
         );
         // The new event already links the original. Exclude it when checking for prior reversals.
         requireThat(
-          !this.s.get(
+          !(await this.s.get(
             'SELECT 1 FROM posted_events WHERE reverses_event_id=? AND id!=?',
             eventId,
             newEvent,
-          ),
+          )),
           'Event already reversed',
           409,
         );
-        for (const m of this.s.all('SELECT * FROM stock_movements WHERE event_id=?', eventId)) {
+        for (const m of await this.s.all(
+          'SELECT * FROM stock_movements WHERE event_id=?',
+          eventId,
+        )) {
           if (m.quantity > 0) {
-            const b = this.batches(m.item_id).find((b) => b.id === m.batch_id)!;
+            const b = (await this.batches(m.item_id)).find((b) => b.id === m.batch_id)!;
             requireThat(
               b.quantity + EPS >= m.quantity,
               'Cannot reverse stock already consumed; reverse dependent events first',
               409,
             );
           }
-          this.movement(newEvent, m.item_id, m.batch_id, -m.quantity, m.id);
+          await this.movement(newEvent, m.item_id, m.batch_id, -m.quantity, m.id);
         }
         if (original.kind === 'receipt')
-          this.refreshPO(this.s.get('SELECT po_id FROM receipts WHERE id=?', eventId)!.po_id);
+          await this.refreshPO(
+            (await this.s.get('SELECT po_id FROM receipts WHERE id=?', eventId))!.po_id,
+          );
       },
       eventId,
     );

@@ -21,6 +21,18 @@ test('local tunnel frontend allowlist accepts only explicit HTTPS origins', () =
     assert.throws(() => httpsOrigin(origin));
 });
 
+test('hosted API configuration runs the backend and routes requests to one function', () => {
+  const config = JSON.parse(readFileSync('config/vercel.backend.json', 'utf8'));
+  assert.equal(config.buildCommand, 'pnpm run build:backend');
+  assert.equal(config.outputDirectory, 'public');
+  assert.equal(config.functions['api/index.ts'].maxDuration, 300);
+  assert.deepEqual(config.rewrites, [{ source: '/(.*)', destination: '/api/index.ts' }]);
+  const entry = readFileSync('api/index.ts', 'utf8');
+  assert.match(entry, /if \(!url \|\|/);
+  assert.ok(!entry.includes('migratePostgres('));
+  assert.ok(!entry.includes('DATABASE_PATH'));
+});
+
 test('Vercel deployment requires a hosted HTTPS backend and rejects credentials and paths', () => {
   for (const value of [
     undefined,

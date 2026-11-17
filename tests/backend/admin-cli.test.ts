@@ -7,8 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { Store } from '../../backend/src/db.js';
-
-test('administrator CLI creates a hashed account without operational seeds and refuses overwrite', () => {
+test('administrator CLI creates a hashed account without operational seeds and refuses overwrite', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'utb-admin-cli-'));
   const path = join(dir, 'test.sqlite');
   const password = randomUUID();
@@ -36,14 +35,14 @@ test('administrator CLI creates a hashed account without operational seeds and r
     assert.match(second.stderr, /already exists/);
     const s = new Store(path);
     try {
-      const user = s.get('SELECT * FROM users WHERE email=?', 'cli@test.local')!;
+      const user = (await s.get('SELECT * FROM users WHERE email=?', 'cli@test.local'))!;
       assert.equal(user.role, 'admin');
       assert.equal(bcrypt.getRounds(user.password_hash), 12);
       assert.ok(bcrypt.compareSync(password, user.password_hash));
       for (const table of ['inventory_items', 'stock_movements', 'operational_sales'])
-        assert.equal(s.get(`SELECT COUNT(*) n FROM ${table}`)!.n, 0);
+        assert.equal((await s.get(`SELECT COUNT(*) n FROM ${table}`))!.n, 0);
     } finally {
-      s.close();
+      await s.close();
     }
   } finally {
     assert.equal(resolve(dirname(dir)), resolve(tmpdir()));
