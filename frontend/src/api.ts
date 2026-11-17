@@ -12,16 +12,32 @@ export class APIError extends Error {
   }
 }
 export async function api<T = any>(path: string, method = 'GET', body?: unknown): Promise<T> {
-  const response = await fetch('/api' + path, {
-    method,
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const result = await response.json();
+  const unavailable = 'The inventory server is unavailable. Please try again shortly.';
+  let response: Response;
+  try {
+    response = await fetch('/api' + path, {
+      method,
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new APIError(
+      'Unable to connect. Please check your internet connection and try again.',
+      0,
+    );
+  }
+  let result;
+  try {
+    if (!response.headers.get('content-type')?.includes('application/json')) throw new Error();
+    result = await response.json();
+    if (result === null || typeof result !== 'object') throw new Error();
+  } catch {
+    throw new APIError(unavailable, response.status);
+  }
   if (!response.ok)
     throw new APIError(
-      result.error +
+      (typeof result.error === 'string' ? result.error : unavailable) +
         (result.details
           ? ' — ' +
             (Array.isArray(result.details)

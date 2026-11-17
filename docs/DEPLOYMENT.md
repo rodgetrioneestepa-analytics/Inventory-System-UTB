@@ -44,4 +44,12 @@ npm run tunnel -- --stop
 
 When the tunnel URL changes, update Vercel's `UTB_API_ORIGIN` and redeploy the frontend. Keep SQLite backups separately and never commit the database, passwords or tunnel state. Free service eligibility and quotas still apply; this setup does not approve plan upgrades or paid overages.
 
+## Login connection errors
+
+If the website opens but login reports that the inventory server is unavailable, check the backend connection before changing any account credentials. A `502 DNS_HOSTNAME_NOT_FOUND` response from `/api/health` means Vercel cannot resolve its configured tunnel hostname. The local database can still be healthy while a temporary tunnel has expired or disconnected.
+
+Check `http://127.0.0.1:3002/api/health` on the backend computer, then the HTTPS `/api/health` at the URL in `.local/tunnel-state.json`. If the temporary tunnel is gone, stop it with `npm run tunnel -- --stop`, start `npm run tunnel`, and use the new HTTPS origin for the production `UTB_API_ORIGIN`. Redeploy Vercel and verify `/api/health`, login, refresh and logout through the production website. Never reset the database or recreate the administrator to repair a network connection.
+
+The login form handles text/HTML gateway errors without exposing a JSON parsing error and allows retrying after the connection recovers. A Quick Tunnel remains temporary; use a named tunnel with a stable hostname for a lasting connection.
+
 References: [Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/), [Vercel SQLite limitations](https://vercel.com/kb/guide/is-sqlite-supported-in-vercel), [Vercel Build Output API](https://vercel.com/docs/build-output-api).

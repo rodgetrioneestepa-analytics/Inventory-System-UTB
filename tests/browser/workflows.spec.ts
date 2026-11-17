@@ -17,6 +17,26 @@ async function save(page: Page, name: string) {
   await page.getByRole('dialog').getByRole('button', { name, exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
+test('login reports gateway outages clearly and can retry after recovery', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Email address').fill(credentials.email);
+  await page.getByLabel('Password', { exact: true }).fill(credentials.password);
+  const gatewayFailure = (route: import('@playwright/test').Route) =>
+    route.fulfill({
+      status: 502,
+      contentType: 'text/plain',
+      body: 'An error occurred with this application. DNS_HOSTNAME_NOT_FOUND',
+    });
+  await page.route('**/api/auth/login', gatewayFailure);
+  await page.getByRole('button', { name: 'Sign in to workspace' }).click();
+  await expect(page.getByRole('alert')).toHaveText(
+    'The inventory server is unavailable. Please try again shortly.',
+  );
+  await expect(page.getByText('Unexpected token', { exact: false })).toHaveCount(0);
+  await page.unroute('**/api/auth/login', gatewayFailure);
+  await page.getByRole('button', { name: 'Sign in to workspace' }).click();
+  await expect(page.getByRole('heading', { name: 'A clear view of your stock.' })).toBeVisible();
+});
 test('main pages, catalog import, stock setup, recipe sale, waste/count, void and persistence', async ({
   page,
 }) => {
